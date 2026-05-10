@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 20% 98%;
+    --foreground: 213 55% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 213 55% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 213 55% 15%;
+    --primary: 213 55% 22%;
+    --primary-foreground: 40 20% 98%;
+    --secondary: 37 45% 92%;
+    --secondary-foreground: 213 55% 15%;
+    --muted: 40 15% 94%;
+    --muted-foreground: 213 15% 45%;
+    --accent: 37 65% 52%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 213 20% 88%;
+    --input: 213 20% 88%;
+    --ring: 37 65% 52%;
+    --radius: 0.5rem;
+
+    --sidebar-background: 213 55% 16%;
+    --sidebar-foreground: 40 20% 92%;
+    --sidebar-primary: 37 65% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 213 45% 22%;
+    --sidebar-accent-foreground: 40 20% 92%;
+    --sidebar-border: 213 40% 24%;
+    --sidebar-ring: 37 65% 52%;
+
+    --color-gold: 37 65% 52%;
+    --color-navy: 213 55% 22%;
+    --color-navy-deep: 213 55% 16%;
+    --color-success: 152 55% 40%;
+    --color-warning: 38 92% 50%;
+    --color-info: 205 75% 50%;
+    --color-pending: 25 85% 55%;
+
+    --status-assigned: 0 0% 100%;
+    --status-gfr: 205 75% 92%;
+    --status-noting: 45 90% 90%;
+    --status-completed: 152 55% 90%;
+    --status-overdue: 0 72% 94%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'Playfair Display', serif;
+  }
+  .font-body {
+    font-family: 'DM Sans', sans-serif;
+  }
+  .gold-gradient {
+    background: linear-gradient(135deg, hsl(37 65% 52%), hsl(42 70% 62%));
+  }
+  .navy-gradient {
+    background: linear-gradient(135deg, hsl(213 55% 16%), hsl(213 55% 28%));
+  }
+  .glass-panel {
+    @apply bg-white/80 backdrop-blur-md border border-white/40;
+  }
+  .status-assigned {
+    background-color: hsl(var(--status-assigned));
+  }
+  .status-gfr {
+    background-color: hsl(var(--status-gfr));
+  }
+  .status-noting {
+    background-color: hsl(var(--status-noting));
+  }
+  .status-completed {
+    background-color: hsl(var(--status-completed));
+  }
+  .status-overdue {
+    background-color: hsl(var(--status-overdue));
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(213 20% 80%);
+    border-radius: 3px;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area, .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}
