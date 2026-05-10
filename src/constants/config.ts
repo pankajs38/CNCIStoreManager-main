@@ -16,6 +16,7 @@ export const GOOGLE_SHEETS_CONFIG = {
   monthlySheetsSheet: "MonthlySheets",
   remindersSheet: "Reminders",
   activityLogsSheet: "ActivityLogs",
+  generalTasksSheet: "GeneralTasks",
 };
 
 export const FILE_NUMBER_MAP: Record<FileNumberCode, string> = {

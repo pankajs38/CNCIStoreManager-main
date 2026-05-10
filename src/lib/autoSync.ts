@@ -5,6 +5,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useTaskStore } from "@/stores/taskStore";
 import { useFileStore } from "@/stores/fileStore";
 import { useTenderStore } from "@/stores/tenderStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 // Debounce timer for auto-sync
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
@@ -54,6 +55,7 @@ const performAutoSync = async (source: string) => {
       useTaskStore.getState().syncToSheet(),
       useFileStore.getState().syncToSheet(),
       useTenderStore.getState().syncToSheet(),
+      useSettingsStore.getState().syncToSheet(),
     ]);
     
     const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length;

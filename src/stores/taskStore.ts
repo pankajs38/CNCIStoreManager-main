@@ -4,7 +4,7 @@ import type { Task, TaskStatus, TaskRemark, TaskPriority, MonthlySheet, MonthlyS
 import { SAMPLE_TASKS } from "@/constants/mockData";
 import { generateId } from "@/lib/utils";
 import { useAuthStore } from "./authStore";
-import { writeTasks, writeMonthlySheets } from "@/lib/sheetServices";
+import { writeTasks, writeMonthlySheets, writeGeneralTasks } from "@/lib/sheetServices";
 import { triggerAutoSync, forceImmediateSync } from "@/lib/autoSync";
 
 interface GeneralTask {
@@ -85,7 +85,7 @@ export const useTaskStore = create<TaskState>()(
       },
 
       syncToSheet: async () => {
-        const { tasks, monthlySheets } = get();
+        const { tasks, monthlySheets, generalTasks } = get();
         const accessToken = useAuthStore.getState().accessToken;
         if (!accessToken) {
           console.warn("No access token for sync to sheet");
@@ -93,21 +93,22 @@ export const useTaskStore = create<TaskState>()(
         }
         
         try {
-          console.log("Syncing tasks and monthlySheets to Google Sheets...");
-          const [tasksResult, monthlyResult] = await Promise.all([
+          console.log("Syncing tasks, monthlySheets, and generalTasks to Google Sheets...");
+          const [tasksResult, monthlyResult, generalTasksResult] = await Promise.all([
             writeTasks(accessToken, tasks),
             writeMonthlySheets(accessToken, monthlySheets),
+            writeGeneralTasks(accessToken, generalTasks),
           ]);
           
-          const success = tasksResult && monthlyResult;
+          const success = tasksResult && monthlyResult && generalTasksResult;
           if (success) {
-            console.log("Successfully synced tasks and monthlySheets to Google Sheets");
+            console.log("Successfully synced tasks, monthlySheets, and generalTasks to Google Sheets");
           } else {
-            console.error("Partial sync for tasks/monthlySheets:", { tasksResult, monthlyResult });
+            console.error("Partial sync for tasks/monthlySheets/generalTasks:", { tasksResult, monthlyResult, generalTasksResult });
           }
           return success;
         } catch (error) {
-          console.error("Failed to sync tasks/monthlySheets to sheet:", error);
+          console.error("Failed to sync tasks/monthlySheets/generalTasks to sheet:", error);
           return false;
         }
       },

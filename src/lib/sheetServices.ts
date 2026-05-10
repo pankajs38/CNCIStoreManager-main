@@ -823,6 +823,49 @@ export const writeActivityLogs = async (accessToken: string, activityLogs: Activ
   return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.activityLogsSheet, ACTIVITY_LOG_HEADERS, rows);
 };
 
+// ==================== WRITE GENERAL TASKS ====================
+const GENERAL_TASK_HEADERS = ["id", "title", "description", "assignedTo", "assignedBy", "createdAt", "updatedAt", "dueDate", "status", "priority", "remarks"];
+
+const generalTaskToRow = (task: any): string[] => [
+  task.id || "",
+  task.title || "",
+  task.description || "",
+  task.assignedTo || "",
+  task.assignedBy || "",
+  task.createdAt || "",
+  task.updatedAt || "",
+  task.dueDate || "",
+  task.status || "pending",
+  task.priority || "medium",
+  JSON.stringify(task.remarks || []),
+];
+
+export const writeGeneralTasks = async (accessToken: string, generalTasks: any[]): Promise<boolean> => {
+  const rows = generalTasks.map(generalTaskToRow);
+  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.generalTasksSheet, GENERAL_TASK_HEADERS, rows);
+};
+
+// ==================== WRITE CUSTOM REMINDERS ====================
+const CUSTOM_REMINDER_HEADERS = ["id", "title", "message", "date", "createdBy", "createdByName", "isCompleted", "linkedType", "linkedId", "linkedLabel"];
+
+const customReminderToRow = (reminder: any): string[] => [
+  reminder.id || "",
+  reminder.title || "",
+  reminder.message || "",
+  reminder.date || "",
+  reminder.createdBy || "",
+  reminder.createdByName || "",
+  String(reminder.isCompleted || false),
+  reminder.linkedType || "",
+  reminder.linkedId || "",
+  reminder.linkedLabel || "",
+];
+
+export const writeCustomReminders = async (accessToken: string, customReminders: any[]): Promise<boolean> => {
+  const rows = customReminders.map(customReminderToRow);
+  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.remindersSheet, CUSTOM_REMINDER_HEADERS, rows);
+};
+
 // ==================== SYNC ALL DATA TO SHEETS ====================
 export interface SyncToSheetResult {
   users: boolean;

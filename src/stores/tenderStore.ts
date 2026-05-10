@@ -119,11 +119,34 @@ export const useTenderStore = create<TenderState>()(
       },
 
       completeTender: (id, awardedTo, awardedPrice, contractStart, contractEnd) => {
+        const tender = get().tenders.find((t) => t.id === id);
+        if (!tender) return;
+        
+        // Determine contract type based on tender case type
+        const contractType = (tender.caseType === "RC" ? "RC" : tender.caseType === "AMC" ? "AMC" : "CMC") as "RC" | "AMC" | "CMC";
+        
+        // Create a contract from the completed tender
+        const newContract: Omit<ContractRecord, "id"> = {
+          tenderId: id,
+          tenderFileNo: tender.fullFileNo || "",
+          subject: tender.subject,
+          type: contractType,
+          awardedTo,
+          startDate: contractStart || "",
+          endDate: contractEnd || "",
+          price: awardedPrice,
+          linkedNewFileId: "",
+          isExpired: false,
+          campus: tender.campus,
+          awardedItems: [],
+        };
+        
         set((state) => ({
           tenders: state.tenders.map((t) => {
             if (t.id !== id) return t;
             return { ...t, isCompleted: true, awardedTo, awardedPrice, contractPeriodStart: contractStart, contractPeriodEnd: contractEnd, currentStage: "completed" as TenderStage, updatedAt: new Date().toISOString() };
           }),
+          contracts: [...state.contracts, { ...newContract, id: generateId() }],
         }));
         triggerAutoSync("tenderStore.completeTender");
       },

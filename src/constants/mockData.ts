@@ -1,11 +1,11 @@
 import type { User, Task, FileRecord, TenderRecord, ContractRecord, TaskRemark, TaskPriority, MonthlySheet } from "@/types";
 
 export const DEFAULT_USERS: User[] = [
-  { id: "u1", name: "Pankaj Srivastava", designation: "Technical Officer (Store & Purchase)", role: "admin", password: "admin123", canCreateTender: true, isActive: true, mobile: "9876543210", email: "pankaj@cnci.gov.in", department: "Store & Purchase" },
-  { id: "u2", name: "Surojit Biswas", designation: "LDC", role: "user", password: "surojit123", canCreateTender: true, isActive: true, mobile: "9876543211", email: "surojit@cnci.gov.in", department: "Store & Purchase" },
-  { id: "u3", name: "Shailesh Kumar Singh", designation: "LDC", role: "user", password: "shailesh123", canCreateTender: false, isActive: true, mobile: "9876543212", email: "shailesh@cnci.gov.in", department: "Store & Purchase" },
-  { id: "u4", name: "Akash", designation: "Office Assistant II", role: "user", password: "akash123", canCreateTender: false, isActive: true, mobile: "9876543213", email: "akash@cnci.gov.in", department: "Store & Purchase" },
-  { id: "u5", name: "Priyanka", designation: "Asst Storekeeper", role: "user", password: "priyanka123", canCreateTender: false, isActive: true, mobile: "9876543214", email: "priyanka@cnci.gov.in", department: "Store & Purchase" },
+  { id: "u1", name: "Pankaj Srivastava", designation: "Technical Officer (Store & Purchase)", role: "admin", password: "Pankaj@123", canCreateTender: true, isActive: true, mobile: "9876543210", email: "pankaj@cnci.gov.in", department: "Store & Purchase" },
+  { id: "u2", name: "Surojit Biswas", designation: "LDC", role: "user", password: "Surojit@123", canCreateTender: true, isActive: true, mobile: "9876543211", email: "surojit@cnci.gov.in", department: "Store & Purchase" },
+  { id: "u3", name: "Shailesh Kumar Singh", designation: "LDC", role: "user", password: "Shailesh@123", canCreateTender: false, isActive: true, mobile: "9876543212", email: "shailesh@cnci.gov.in", department: "Store & Purchase" },
+  { id: "u4", name: "Akash", designation: "Office Assistant II", role: "user", password: "Akash@123", canCreateTender: false, isActive: true, mobile: "9876543213", email: "akash@cnci.gov.in", department: "Store & Purchase" },
+  { id: "u5", name: "Priyanka", designation: "Asst Storekeeper", role: "user", password: "Priyanka@123", canCreateTender: false, isActive: true, mobile: "9876543214", email: "priyanka@cnci.gov.in", department: "Store & Purchase" },
 ];
 
 const mkRemark = (text: string, user: string, date: string): TaskRemark => ({ text, user, date });

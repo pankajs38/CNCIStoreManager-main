@@ -33,7 +33,8 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       currentUser: null,
-      users: [],
+      // Use DEFAULT_USERS as initial state - persist middleware will load from localStorage if available
+      users: DEFAULT_USERS,
       isAuthenticated: false,
       isLoading: false,
       lastSynced: null,
@@ -105,7 +106,9 @@ export const useAuthStore = create<AuthState>()(
       },
 
       login: (name, password) => {
-        const user = get().users.find(
+        // Use DEFAULT_USERS if store users is empty (e.g., after localStorage clear)
+        const availableUsers = get().users.length > 0 ? get().users : DEFAULT_USERS;
+        const user = availableUsers.find(
           (u) => u.name.toLowerCase() === name.toLowerCase() && u.password === password && u.isActive
         );
         if (user) {

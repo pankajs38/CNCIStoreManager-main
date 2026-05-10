@@ -2,6 +2,9 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ActivityLogEntry, Vendor } from "@/types";
 import { generateId } from "@/lib/utils";
+import { useAuthStore } from "./authStore";
+import { writeVendors, writeActivityLogs, writeCustomReminders } from "@/lib/sheetServices";
+import { triggerAutoSync } from "@/lib/autoSync";
 
 export interface CustomReminder {
   id: string;
@@ -137,6 +140,7 @@ interface SettingsState {
 
   addActivityLog: (entry: Omit<ActivityLogEntry, "id" | "timestamp">) => void;
   clearActivityLog: () => void;
+  syncToSheet: () => Promise<boolean>;
 
   addNotification: (n: Omit<InAppNotification, "id" | "timestamp" | "isRead">) => void;
   markNotificationRead: (id: string) => void;
@@ -146,7 +150,7 @@ interface SettingsState {
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       saveReminderUsers: ["u1", "u2"],
       customFileNumbers: [],
       fileFormatTemplate: "CNCI/{campus}/S&P/{fileNo}/{type}/{fiscalYear}/{continueNo}",
@@ -199,12 +203,18 @@ export const useSettingsStore = create<SettingsState>()(
       toggleTabVisibility: (key) =>
         set((state) => ({ tabOrder: state.tabOrder.map((t) => (t.key === key ? { ...t, visible: !t.visible } : t)) })),
       setHomeDashboardWidgets: (widgets) => set({ homeDashboardWidgets: widgets }),
-      addCustomReminder: (reminder) =>
-        set((state) => ({ customReminders: [...state.customReminders, reminder] })),
-      updateCustomReminder: (id, updates) =>
-        set((state) => ({ customReminders: state.customReminders.map((r) => (r.id === id ? { ...r, ...updates } : r)) })),
-      removeCustomReminder: (id) =>
-        set((state) => ({ customReminders: state.customReminders.filter((r) => r.id !== id) })),
+      addCustomReminder: (reminder) => {
+        set((state) => ({ customReminders: [...state.customReminders, reminder] }));
+        triggerAutoSync("settingsStore.addCustomReminder");
+      },
+      updateCustomReminder: (id, updates) => {
+        set((state) => ({ customReminders: state.customReminders.map((r) => (r.id === id ? { ...r, ...updates } : r)) }));
+        triggerAutoSync("settingsStore.updateCustomReminder");
+      },
+      removeCustomReminder: (id) => {
+        set((state) => ({ customReminders: state.customReminders.filter((r) => r.id !== id) }));
+        triggerAutoSync("settingsStore.removeCustomReminder");
+      },
       applyThemePreset: (preset) =>
         set((state) => ({
           pageColors: state.pageColors.map((p) => {
@@ -214,22 +224,63 @@ export const useSettingsStore = create<SettingsState>()(
           }),
         })),
 
-      addVendor: (vendor) => set((state) => ({ vendors: [...state.vendors, vendor] })),
-      updateVendor: (id, updates) =>
-        set((state) => ({ vendors: state.vendors.map((v) => (v.id === id ? { ...v, ...updates } : v)) })),
-      removeVendor: (id) => set((state) => ({ vendors: state.vendors.filter((v) => v.id !== id) })),
-      importVendors: (newVendors) =>
+      addVendor: (vendor) => {
+        set((state) => ({ vendors: [...state.vendors, vendor] }));
+        triggerAutoSync("settingsStore.addVendor");
+      },
+      updateVendor: (id, updates) => {
+        set((state) => ({ vendors: state.vendors.map((v) => (v.id === id ? { ...v, ...updates } : v)) }));
+        triggerAutoSync("settingsStore.updateVendor");
+      },
+      removeVendor: (id) => {
+        set((state) => ({ vendors: state.vendors.filter((v) => v.id !== id) }));
+        triggerAutoSync("settingsStore.removeVendor");
+      },
+      importVendors: (newVendors) => {
         set((state) => {
           const existingNames = new Set(state.vendors.map((v) => v.name.toLowerCase()));
           const unique = newVendors.filter((v) => !existingNames.has(v.name.toLowerCase()));
           return { vendors: [...state.vendors, ...unique] };
-        }),
+        });
+        triggerAutoSync("settingsStore.importVendors");
+      },
 
-      addActivityLog: (entry) =>
+      addActivityLog: (entry) => {
         set((state) => ({
           activityLog: [{ ...entry, id: generateId(), timestamp: new Date().toISOString() }, ...state.activityLog].slice(0, 500),
-        })),
+        }));
+        triggerAutoSync("settingsStore.addActivityLog");
+      },
       clearActivityLog: () => set({ activityLog: [] }),
+
+      syncToSheet: async () => {
+        const { vendors, activityLog, customReminders } = get();
+        const accessToken = useAuthStore.getState().accessToken;
+        if (!accessToken) {
+          console.warn("No access token for sync to sheet");
+          return false;
+        }
+        
+        try {
+          console.log("Syncing vendors, activityLog, and customReminders to Google Sheets...");
+          const [vendorsResult, activityResult, remindersResult] = await Promise.all([
+            writeVendors(accessToken, vendors),
+            writeActivityLogs(accessToken, activityLog),
+            writeCustomReminders(accessToken, customReminders),
+          ]);
+          
+          const success = vendorsResult && activityResult && remindersResult;
+          if (success) {
+            console.log("Successfully synced vendors, activityLog, and customReminders to Google Sheets");
+          } else {
+            console.error("Partial sync for vendors/activityLog/customReminders:", { vendorsResult, activityResult, remindersResult });
+          }
+          return success;
+        } catch (error) {
+          console.error("Failed to sync vendors/activityLog/customReminders to sheet:", error);
+          return false;
+        }
+      },
 
       addNotification: (n) =>
         set((state) => ({
