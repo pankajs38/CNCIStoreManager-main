@@ -3,7 +3,7 @@
 
 const GOOGLE_CLIENT_ID = "115165360944-vslumgpv39rtrmovdmfeg3n73j97q9lo.apps.googleusercontent.com";
 const GOOGLE_CLIENT_SECRET = "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";
-const REDIRECT_URI = "https://cncistoremanager-rxih.onrender.com";
+const REDIRECT_URI = "https://cncistoremanager-rxih.onrender.com/auth/callback";
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
 // Generate random string for state parameter
