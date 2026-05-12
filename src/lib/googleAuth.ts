@@ -3,7 +3,7 @@
 
 const GOOGLE_CLIENT_ID = "115165360944-vslumgpv39rtrmovdmfeg3n73j97q9lo.apps.googleusercontent.com";
 const GOOGLE_CLIENT_SECRET = "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";
-const REDIRECT_URI = "http://localhost:8080/auth/callback";
+const REDIRECT_URI = "https://cncistoremanager-rxih.onrender.com/auth/callback";
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
 // Generate random string for state parameter
@@ -16,7 +16,7 @@ let oauthState: string | null = null;
 
 export const initiateGoogleOAuth = (): void => {
   oauthState = generateState();
-  sessionStorage.setItem("oauth_state", oauthState);
+  localStorage.setItem("oauth_state", oauthState);
 
   const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   authUrl.searchParams.set("client_id", GOOGLE_CLIENT_ID);
@@ -25,23 +25,23 @@ export const initiateGoogleOAuth = (): void => {
   authUrl.searchParams.set("scope", SCOPES.join(" "));
   authUrl.searchParams.set("state", oauthState);
   authUrl.searchParams.set("access_type", "offline");
-  // Removed "prompt": "consent" to allow cached sessions
+  authUrl.searchParams.set("prompt", "consent");
 
   window.location.href = authUrl.toString();
 };
 
-export const handleOAuthCallback = async (code: string, state: string): Promise<string | null> => {
-  const savedState = sessionStorage.getItem("oauth_state");
+export const handleOAuthCallback = async (code: string, state: string): Promise<{ accessToken: string; refreshToken?: string } | null> => {
+  const savedState = localStorage.getItem("oauth_state");
   
   // State from Google might contain additional params (like iss), extract just the state value
   const stateValue = state.split('&')[0];
   
-  if (stateValue !== savedState) {
+  if (savedState && stateValue !== savedState) {
     console.error("OAuth state mismatch!", { received: stateValue, saved: savedState });
     return null;
   }
 
-  sessionStorage.removeItem("oauth_state");
+  localStorage.removeItem("oauth_state");
 
   try {
     // Exchange code for tokens
@@ -68,7 +68,7 @@ export const handleOAuthCallback = async (code: string, state: string): Promise<
     }
 
     const data = JSON.parse(responseText);
-    return data.access_token;
+    return { accessToken: data.access_token, refreshToken: data.refresh_token };
   } catch (error) {
     console.error("OAuth token exchange failed:", error);
     return null;

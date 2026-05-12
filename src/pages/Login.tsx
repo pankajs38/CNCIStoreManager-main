@@ -27,11 +27,6 @@ export default function Login() {
     console.log("Available users for login:", users.map(u => ({ name: u.name, password: u.password, isActive: u.isActive })));
     console.log("Attempting login with:", name, password);
     
-    if (users.length === 0) {
-      setError("No users loaded. Please wait for Google Sheets sync or refresh the page.");
-      return;
-    }
-    
     const success = login(name, password);
     if (success) {
       navigate("/dashboard");
@@ -146,12 +141,6 @@ export default function Login() {
                 <div className="bg-blue-50 border border-blue-200 text-blue-700 text-sm px-3 py-2 rounded-lg flex items-center gap-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                   Loading users from Google Sheets...
-                </div>
-              )}
-
-              {!isLoading && users.length === 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 text-sm px-3 py-2 rounded-lg">
-                  No users loaded. Please refresh or check Google Sheets connection.
                 </div>
               )}
 

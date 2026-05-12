@@ -60,11 +60,15 @@ function OAuthCallback() {
       }
 
       try {
-        const token = await handleOAuthCallback(code, state);
+        const tokens = await handleOAuthCallback(code, state);
         
-        if (token) {
-          setAccessToken(token);
-          await syncFromSheet(token);
+        if (tokens) {
+          setAccessToken(tokens.accessToken);
+          if (tokens.refreshToken) {
+            // Store refresh token if available
+            localStorage.setItem("refresh_token", tokens.refreshToken);
+          }
+          await syncFromSheet(tokens.accessToken);
           
           // Load all data into individual stores
           useTaskStore.getState().loadFromSheetData();
@@ -76,11 +80,15 @@ function OAuthCallback() {
         } else {
           console.error("Failed to get access token");
           setError("Authentication failed. Please try again.");
+          // Clear URL params to prevent re-attempt
+          window.history.replaceState({}, document.title, window.location.pathname);
           setTimeout(() => navigate("/login", { replace: true }), 2000);
         }
       } catch (err) {
         console.error("OAuth callback error:", err);
         setError("Authentication error. Please try again.");
+        // Clear URL params to prevent re-attempt
+        window.history.replaceState({}, document.title, window.location.pathname);
         setTimeout(() => navigate("/login", { replace: true }), 2000);
       }
     };

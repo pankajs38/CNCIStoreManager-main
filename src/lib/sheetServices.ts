@@ -55,23 +55,57 @@ export const fetchSheetData = async (accessToken: string, sheetName: string): Pr
   }
   
   try {
-    // Use a larger range to accommodate more columns
-    const response = await fetch(
-      `${GOOGLE_SHEETS_API}/${SPREADSHEET_ID}/values/${sheetName}!A:ZZ`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
+    const tryFetch = async (token: string) => {
+      const response = await fetch(
+        `${GOOGLE_SHEETS_API}/${SPREADSHEET_ID}/values/${sheetName}!A:ZZ`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      return response;
+    };
+
+    let response = await tryFetch(accessToken);
+
+    if (response.status === 401) {
+      // Try to refresh token
+      const refreshToken = localStorage.getItem("refresh_token");
+      if (refreshToken) {
+        try {
+          const refreshResponse = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              refresh_token: refreshToken,
+              client_id: GOOGLE_CLIENT_ID,
+              client_secret: GOOGLE_CLIENT_SECRET,
+              grant_type: "refresh_token",
+            }),
+          });
+
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json();
+            const newAccessToken = refreshData.access_token;
+            // Update stored token
+            // Assuming there's a way to update in store, but for now, use the new token
+            console.log("Token refreshed successfully");
+            response = await tryFetch(newAccessToken);
+          } else {
+            console.error("Failed to refresh token");
+          }
+        } catch (error) {
+          console.error("Error refreshing token:", error);
+        }
       }
-    );
+    }
 
     if (!response.ok) {
       console.error(`Failed to fetch sheet ${sheetName}:`, response.status, response.statusText);
-      // If 401, the token is invalid - clear it
-      if (response.status === 401) {
-        console.error("Token is invalid/expired - need to re-authenticate");
-      }
       return [];
     }
 
@@ -492,17 +526,15 @@ export interface AllSheetData {
 }
 
 export const syncAllData = async (accessToken: string): Promise<AllSheetData> => {
-  const [users, tasks, files, tenders, contracts, vendors, monthlySheets, reminders, activityLogs] = await Promise.all([
-    fetchUsers(accessToken),
-    fetchTasks(accessToken),
-    fetchFiles(accessToken),
-    fetchTenders(accessToken),
-    fetchContracts(accessToken),
-    fetchVendors(accessToken),
-    fetchMonthlySheets(accessToken),
-    fetchReminders(accessToken),
-    fetchActivityLogs(accessToken),
-  ]);
+  const users = await fetchUsers(accessToken);
+  const tasks = await fetchTasks(accessToken);
+  const files = await fetchFiles(accessToken);
+  const tenders = await fetchTenders(accessToken);
+  const contracts = await fetchContracts(accessToken);
+  const vendors = await fetchVendors(accessToken);
+  const monthlySheets = await fetchMonthlySheets(accessToken);
+  const reminders = await fetchReminders(accessToken);
+  const activityLogs = await fetchActivityLogs(accessToken);
 
   return {
     users,
@@ -538,7 +570,7 @@ const writeSheetData = async (accessToken: string, sheetName: string, headers: s
     return false;
   }
   
-  try {
+  const tryWrite = async (token: string) => {
     const values = [headers, ...rows];
     console.log(`Writing to sheet "${sheetName}": ${rows.length} rows, ${headers.length} columns`);
     
@@ -554,26 +586,59 @@ const writeSheetData = async (accessToken: string, sheetName: string, headers: s
       {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ values }),
       }
     );
 
-    const responseText = await response.text();
-    console.log(`Write response for "${sheetName}":`, response.status, responseText);
+    return response;
+  };
 
-    if (!response.ok) {
-      console.error(`Failed to write to sheet ${sheetName}:`, response.status, responseText);
-      return false;
+  let response = await tryWrite(accessToken);
+
+  if (response.status === 401) {
+    // Try to refresh token
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (refreshToken) {
+      try {
+        const refreshResponse = await fetch("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            refresh_token: refreshToken,
+            client_id: GOOGLE_CLIENT_ID,
+            client_secret: GOOGLE_CLIENT_SECRET,
+            grant_type: "refresh_token",
+          }),
+        });
+
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
+          const newAccessToken = refreshData.access_token;
+          console.log("Token refreshed successfully for write");
+          response = await tryWrite(newAccessToken);
+        } else {
+          console.error("Failed to refresh token for write");
+        }
+      } catch (error) {
+        console.error("Error refreshing token for write:", error);
+      }
     }
+  }
 
-    return true;
-  } catch (error) {
-    console.error(`Error writing to sheet ${sheetName}:`, error);
+  const responseText = await response.text();
+  console.log(`Write response for "${sheetName}":`, response.status, responseText);
+
+  if (!response.ok) {
+    console.error(`Failed to write to sheet ${sheetName}:`, response.status, responseText);
     return false;
   }
+
+  return true;
 };
 
 // ==================== WRITE USERS ====================

@@ -106,8 +106,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       login: (name, password) => {
-        // Use DEFAULT_USERS if store users is empty (e.g., after localStorage clear)
-        const availableUsers = get().users.length > 0 ? get().users : DEFAULT_USERS;
+        // Always include DEFAULT_USERS as fallback
+        const availableUsers = [...DEFAULT_USERS, ...get().users];
         const user = availableUsers.find(
           (u) => u.name.toLowerCase() === name.toLowerCase() && u.password === password && u.isActive
         );

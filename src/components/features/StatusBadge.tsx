@@ -7,7 +7,7 @@ interface TaskStatusBadgeProps {
 }
 
 export function TaskStatusBadge({ status }: TaskStatusBadgeProps) {
-  const config = TASK_STATUS_CONFIG[status];
+  const config = TASK_STATUS_CONFIG[status] || { label: status || "Unknown", color: "bg-gray-100", textColor: "text-gray-700" };
   return (
     <span className={cn("inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold", config.color, config.textColor)}>
       {config.label}
