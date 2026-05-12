@@ -3,8 +3,15 @@
 
 const GOOGLE_CLIENT_ID = "115165360944-vslumgpv39rtrmovdmfeg3n73j97q9lo.apps.googleusercontent.com";
 const GOOGLE_CLIENT_SECRET = "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";
-const REDIRECT_URI = "https://cncistoremanager-rxih.onrender.com/auth/callback";
+const FALLBACK_REDIRECT_URI = "https://cncistoremanager-rxih.onrender.com/auth/callback";
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
+
+const getRedirectUri = (): string => {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/auth/callback`;
+  }
+  return FALLBACK_REDIRECT_URI;
+};
 
 // Generate random string for state parameter
 const generateState = (): string => {
@@ -18,9 +25,12 @@ export const initiateGoogleOAuth = (): void => {
   oauthState = generateState();
   localStorage.setItem("oauth_state", oauthState);
 
+  const redirectUri = getRedirectUri();
+  console.log("Google OAuth redirect_uri:", redirectUri);
+
   const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   authUrl.searchParams.set("client_id", GOOGLE_CLIENT_ID);
-  authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
+  authUrl.searchParams.set("redirect_uri", redirectUri);
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("scope", SCOPES.join(" "));
   authUrl.searchParams.set("state", oauthState);
@@ -54,7 +64,7 @@ export const handleOAuthCallback = async (code: string, state: string): Promise<
         code,
         client_id: GOOGLE_CLIENT_ID,
         client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: getRedirectUri(),
         grant_type: "authorization_code",
       }),
     });
