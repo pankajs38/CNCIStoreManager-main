@@ -71,36 +71,24 @@ export const fetchSheetData = async (accessToken: string, sheetName: string): Pr
     let response = await tryFetch(accessToken);
 
     if (response.status === 401) {
-      // Try to refresh token
-      const refreshToken = localStorage.getItem("refresh_token");
-      if (refreshToken) {
-        try {
-          const refreshResponse = await fetch("https://oauth2.googleapis.com/token", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              refresh_token: refreshToken,
-              client_id: GOOGLE_CLIENT_ID,
-              client_secret: GOOGLE_CLIENT_SECRET,
-              grant_type: "refresh_token",
-            }),
-          });
+      try {
+        const refreshResponse = await fetch("/api/auth/refresh", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
 
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json();
-            const newAccessToken = refreshData.access_token;
-            // Update stored token
-            // Assuming there's a way to update in store, but for now, use the new token
-            console.log("Token refreshed successfully");
-            response = await tryFetch(newAccessToken);
-          } else {
-            console.error("Failed to refresh token");
-          }
-        } catch (error) {
-          console.error("Error refreshing token:", error);
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
+          const newAccessToken = refreshData.access_token;
+          console.log("Token refreshed successfully");
+          response = await tryFetch(newAccessToken);
+        } else {
+          console.error("Failed to refresh token via backend");
         }
+      } catch (error) {
+        console.error("Error refreshing token via backend:", error);
       }
     }
 
@@ -599,21 +587,12 @@ const writeSheetData = async (accessToken: string, sheetName: string, headers: s
   let response = await tryWrite(accessToken);
 
   if (response.status === 401) {
-    // Try to refresh token
-    const refreshToken = localStorage.getItem("refresh_token");
-    if (refreshToken) {
       try {
-        const refreshResponse = await fetch("https://oauth2.googleapis.com/token", {
-          method: "POST",
+        const refreshResponse = await fetch("/api/auth/refresh", {
+          method: "GET",
           headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Type": "application/json",
           },
-          body: new URLSearchParams({
-            refresh_token: refreshToken,
-            client_id: GOOGLE_CLIENT_ID,
-            client_secret: GOOGLE_CLIENT_SECRET,
-            grant_type: "refresh_token",
-          }),
         });
 
         if (refreshResponse.ok) {
@@ -622,13 +601,12 @@ const writeSheetData = async (accessToken: string, sheetName: string, headers: s
           console.log("Token refreshed successfully for write");
           response = await tryWrite(newAccessToken);
         } else {
-          console.error("Failed to refresh token for write");
+          console.error("Failed to refresh token via backend for write");
         }
       } catch (error) {
-        console.error("Error refreshing token for write:", error);
+        console.error("Error refreshing token via backend for write:", error);
       }
     }
-  }
 
   const responseText = await response.text();
   console.log(`Write response for "${sheetName}":`, response.status, responseText);
