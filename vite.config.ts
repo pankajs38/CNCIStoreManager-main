@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     host: "::",
     port: 8080,
-    allowedHosts: ["cncistoremanager.onrender.com", "localhost"]
+    allowedHosts: ["cncistoremanager.onrender.com", "cncistoremanager-main.onrender.com", "localhost"]
   },
   plugins: [
     react(),
