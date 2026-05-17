@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "start:server": "node server/index.js",
+    "start": "npm run start:server",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -96,6 +98,9 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.20",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.3",
+    "express": "^4.18.4",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",

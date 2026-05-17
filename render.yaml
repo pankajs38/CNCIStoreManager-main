@@ -1,13 +1,6 @@
 services:
-  - type: static_site
+  - type: web_service
     name: cncistoremanager-main
-    env: static
-    buildCommand: npm run build
-    publishPath: dist
-    routes:
-      - type: rewrite
-        source: /auth/callback
-        destination: /index.html
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:server

@@ -46,54 +46,39 @@ function OAuthCallback() {
 
   useEffect(() => {
     const parseCallbackParams = () => {
-      let code = null;
-      let state = null;
+      const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
+      const [, query] = hash.split("?", 2);
+      const params = new URLSearchParams(query || "");
 
-      const urlParams = new URLSearchParams(window.location.search);
-      code = urlParams.get("code");
-      state = urlParams.get("state");
-
-      if ((!code || !state) && window.location.hash) {
-        const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
-        const [, query] = hash.split("?", 2);
-        if (query) {
-          const hashParams = new URLSearchParams(query);
-          code = code || hashParams.get("code");
-          state = state || hashParams.get("state");
-        }
-      }
-
-      return { code, state };
+      return {
+        accessToken: params.get("access_token"),
+      };
     };
 
     const processCallback = async () => {
       if (hasProcessedRef.current) return;
       hasProcessedRef.current = true;
 
-      const { code, state } = parseCallbackParams();
+      const { accessToken } = parseCallbackParams();
 
-      if (!code || !state) {
-        console.warn("No OAuth code or state found, redirecting to login");
+      if (!accessToken) {
+        console.warn("No OAuth access token found, redirecting to login");
         navigate("/login", { replace: true });
         return;
       }
 
       try {
-        const tokens = await handleOAuthCallback(code, state);
-        
+        const tokens = await handleOAuthCallback();
+
         if (tokens) {
           setAccessToken(tokens.accessToken);
-          if (tokens.refreshToken) {
-            // Store refresh token if available
-            localStorage.setItem("refresh_token", tokens.refreshToken);
-          }
           await syncFromSheet(tokens.accessToken);
-          
+
           // Load all data into individual stores
           useTaskStore.getState().loadFromSheetData();
           useTenderStore.getState().loadFromSheetData();
           useFileStore.getState().loadFromSheetData();
-          
+
           // Redirect to dashboard after successful auth
           navigate("/dashboard", { replace: true });
         } else {

@@ -1,20 +1,62 @@
 // filepath: src/lib/googleAuth.ts
-// Google OAuth configuration
+// Google OAuth client helpers for a secure backend-based OAuth flow
 
-const GOOGLE_CLIENT_ID = "115165360944-vslumgpv39rtrmovdmfeg3n73j97q9lo.apps.googleusercontent.com";
-const GOOGLE_CLIENT_SECRET = "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";
-const FALLBACK_REDIRECT_URI = "https://cncistoremanager-main.onrender.com/#/auth/callback";
-const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
-
-const getRedirectUri = (): string => {
+const getBackendBase = (): string => {
   if (typeof window !== "undefined" && window.location?.origin) {
-    return `${window.location.origin}/#/auth/callback`;
+    return window.location.origin;
   }
-  return FALLBACK_REDIRECT_URI;
+  return "";
 };
 
-// Generate random string for state parameter
-const generateState = (): string => {
+export const initiateGoogleOAuth = (): void => {
+  window.location.href = `${getBackendBase()}/api/auth/start`;
+};
+
+const parseHashParams = () => {
+  if (typeof window === "undefined") {
+    return new URLSearchParams("");
+  }
+
+  const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
+  const [, query] = hash.split("?", 2);
+  return new URLSearchParams(query || "");
+};
+
+export const handleOAuthCallback = async (): Promise<{ accessToken: string } | null> => {
+  const params = parseHashParams();
+  const accessToken = params.get("access_token");
+
+  if (!accessToken) {
+    return null;
+  }
+
+  return { accessToken };
+};
+
+export const refreshAccessToken = async (): Promise<string | null> => {
+  try {
+    const response = await fetch("/api/auth/refresh", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return data.access_token || null;
+  } catch (error) {
+    console.error("Refresh token request failed:", error);
+    return null;
+  }
+};
+
+export const isOAuthConfigured = (): boolean => {
+  return true;
+};
   return Math.random().toString(36).substring(2, 15);
 };
 

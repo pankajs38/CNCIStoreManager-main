@@ -4,7 +4,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useTaskStore } from "@/stores/taskStore";
 import { useTenderStore } from "@/stores/tenderStore";
 import { useFileStore } from "@/stores/fileStore";
-import { initiateGoogleOAuth, handleOAuthCallback } from "@/lib/googleAuth";
+import { initiateGoogleOAuth } from "@/lib/googleAuth";
 
 interface GoogleSheetsSyncProps {
   children: React.ReactNode;
@@ -20,24 +20,21 @@ export const GoogleSheetsSync = ({ children }: GoogleSheetsSyncProps) => {
 
   useEffect(() => {
     const parseCallbackParams = () => {
-      let code = null;
-      let state = null;
-
       const urlParams = new URLSearchParams(window.location.search);
-      code = urlParams.get("code");
-      state = urlParams.get("state");
+      const code = urlParams.get("code");
+      const state = urlParams.get("state");
 
-      if ((!code || !state) && window.location.hash) {
+      let accessToken = null;
+      if (window.location.hash) {
         const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
         const [, query] = hash.split("?", 2);
         if (query) {
           const hashParams = new URLSearchParams(query);
-          code = code || hashParams.get("code");
-          state = state || hashParams.get("state");
+          accessToken = hashParams.get("access_token");
         }
       }
 
-      return { code, state };
+      return { code, state, accessToken };
     };
 
     const performSync = async () => {
@@ -55,6 +52,11 @@ export const GoogleSheetsSync = ({ children }: GoogleSheetsSyncProps) => {
 
       // If we have OAuth params in URL, skip processing here (OAuthCallback will handle)
       if (code && state) {
+        return;
+      }
+
+      // If we are using the backend callback hash route, skip processing here as well
+      if (accessToken) {
         return;
       }
 
