@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState, useRef } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuthStore } from "@/stores/authStore";
 import { Toaster } from "@/components/ui/toaster";
@@ -45,13 +45,32 @@ function OAuthCallback() {
   const hasProcessedRef = useRef(false);
 
   useEffect(() => {
+    const parseCallbackParams = () => {
+      let code = null;
+      let state = null;
+
+      const urlParams = new URLSearchParams(window.location.search);
+      code = urlParams.get("code");
+      state = urlParams.get("state");
+
+      if ((!code || !state) && window.location.hash) {
+        const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
+        const [, query] = hash.split("?", 2);
+        if (query) {
+          const hashParams = new URLSearchParams(query);
+          code = code || hashParams.get("code");
+          state = state || hashParams.get("state");
+        }
+      }
+
+      return { code, state };
+    };
+
     const processCallback = async () => {
       if (hasProcessedRef.current) return;
       hasProcessedRef.current = true;
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get("code");
-      const state = urlParams.get("state");
+      const { code, state } = parseCallbackParams();
 
       if (!code || !state) {
         console.warn("No OAuth code or state found, redirecting to login");
@@ -120,7 +139,7 @@ function OAuthCallback() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -147,6 +166,6 @@ export default function App() {
         </Routes>
       </Suspense>
       <Toaster />
-    </BrowserRouter>
+    </HashRouter>
   );
 }

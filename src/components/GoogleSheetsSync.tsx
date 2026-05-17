@@ -19,6 +19,27 @@ export const GoogleSheetsSync = ({ children }: GoogleSheetsSyncProps) => {
   const hasInitiatedOAuthRef = useRef(false);
 
   useEffect(() => {
+    const parseCallbackParams = () => {
+      let code = null;
+      let state = null;
+
+      const urlParams = new URLSearchParams(window.location.search);
+      code = urlParams.get("code");
+      state = urlParams.get("state");
+
+      if ((!code || !state) && window.location.hash) {
+        const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
+        const [, query] = hash.split("?", 2);
+        if (query) {
+          const hashParams = new URLSearchParams(query);
+          code = code || hashParams.get("code");
+          state = state || hashParams.get("state");
+        }
+      }
+
+      return { code, state };
+    };
+
     const performSync = async () => {
       // Prevent multiple concurrent sync attempts
       if (hasSyncedRef.current) {
@@ -26,14 +47,11 @@ export const GoogleSheetsSync = ({ children }: GoogleSheetsSyncProps) => {
       }
 
       // Skip OAuth processing if we're on the callback route - let OAuthCallback component handle it
-      if (window.location.pathname === "/auth/callback") {
+      if (window.location.pathname === "/auth/callback" || window.location.hash.startsWith("#/auth/callback")) {
         return;
       }
 
-      // Check for OAuth callback in URL - if found, let the OAuthCallback route handle it
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get("code");
-      const state = urlParams.get("state");
+      const { code, state } = parseCallbackParams();
 
       // If we have OAuth params in URL, skip processing here (OAuthCallback will handle)
       if (code && state) {

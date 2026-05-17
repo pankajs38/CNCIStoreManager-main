@@ -3,12 +3,12 @@
 
 const GOOGLE_CLIENT_ID = "115165360944-vslumgpv39rtrmovdmfeg3n73j97q9lo.apps.googleusercontent.com";
 const GOOGLE_CLIENT_SECRET = "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";
-const FALLBACK_REDIRECT_URI = "https://cncistoremanager-rxih.onrender.com/auth/callback";
+const FALLBACK_REDIRECT_URI = "https://cncistoremanager-main.onrender.com/#/auth/callback";
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
 const getRedirectUri = (): string => {
   if (typeof window !== "undefined" && window.location?.origin) {
-    return `${window.location.origin}/auth/callback`;
+    return `${window.location.origin}/#/auth/callback`;
   }
   return FALLBACK_REDIRECT_URI;
 };

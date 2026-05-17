@@ -1,6 +1,6 @@
 services:
   - type: static_site
-    name: cncistoremanager
+    name: cncistoremanager-main
     env: static
     buildCommand: npm run build
     publishPath: dist
