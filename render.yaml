@@ -6,5 +6,8 @@ services:
     publishPath: dist
     routes:
       - type: rewrite
+        source: /auth/callback
+        destination: /index.html
+      - type: rewrite
         source: /*
         destination: /index.html
