@@ -2,5 +2,7 @@ services:
   - type: web_service
     name: cncistoremanager-main
     env: node
+    branch: main
     buildCommand: npm install && npm run build
     startCommand: npm run start:server
+    plan: free
