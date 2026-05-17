@@ -1,6 +1,7 @@
 // filepath: src/lib/sheetServices.ts
 import { GOOGLE_SHEETS_CONFIG } from "@/constants/config";
 import { generateId } from "./utils";
+import { getBackendBase } from "@/lib/googleAuth";
 import type { 
   User, Task, FileRecord, TenderRecord, ContractRecord, Vendor, 
   MonthlySheet, MonthlySheetItem, Reminder, ActivityLogEntry,
@@ -72,7 +73,7 @@ export const fetchSheetData = async (accessToken: string, sheetName: string): Pr
 
     if (response.status === 401) {
       try {
-        const refreshResponse = await fetch("/api/auth/refresh", {
+        const refreshResponse = await fetch(`${getBackendBase()}/api/auth/refresh`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -588,7 +589,7 @@ const writeSheetData = async (accessToken: string, sheetName: string, headers: s
 
   if (response.status === 401) {
       try {
-        const refreshResponse = await fetch("/api/auth/refresh", {
+        const refreshResponse = await fetch(`${getBackendBase()}/api/auth/refresh`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

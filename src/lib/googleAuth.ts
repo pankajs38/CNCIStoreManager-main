@@ -1,7 +1,12 @@
 // filepath: src/lib/googleAuth.ts
 // Google OAuth client helpers for a secure backend-based OAuth flow
 
-const getBackendBase = (): string => {
+export const getBackendBase = (): string => {
+  const apiBase = import.meta.env.VITE_API_BASE;
+  if (apiBase) {
+    return apiBase.replace(/\/$/, "");
+  }
+
   if (typeof window !== "undefined" && window.location?.origin) {
     return window.location.origin;
   }
@@ -35,7 +40,7 @@ export const handleOAuthCallback = async (): Promise<{ accessToken: string } | n
 
 export const refreshAccessToken = async (): Promise<string | null> => {
   try {
-    const response = await fetch("/api/auth/refresh", {
+    const response = await fetch(`${getBackendBase()}/api/auth/refresh`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
