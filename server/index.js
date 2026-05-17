@@ -18,13 +18,19 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
 
 const app = express();
 app.use(cookieParser());
+// When running behind a proxy (like Render), trust the proxy so
+// `req.protocol` reflects the original request (http vs https).
+app.set("trust proxy", true);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.resolve(__dirname, "../dist");
 
 const getRedirectUri = (req) => {
-  const origin = `${req.protocol}://${req.get("host")}`;
+  // Prefer the X-Forwarded-Proto header when available (proxy sets this).
+  const forwardedProto = (req.get("x-forwarded-proto") || req.protocol || "http").split(",")[0];
+  const proto = forwardedProto.includes("https") ? "https" : "http";
+  const origin = `${proto}://${req.get("host")}`;
   return `${origin}/api/auth/callback`;
 };
 
