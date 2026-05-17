@@ -4,5 +4,5 @@ services:
     env: node
     branch: main
     buildCommand: npm install && npm run build
-    startCommand: npm run start:server
+    startCommand: npm start
     plan: free
