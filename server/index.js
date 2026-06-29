@@ -82,60 +82,50 @@ app.post("/api/write-sheet", (req, res) => {
     const excelPath = path.join(distPath, "CNCIStoreManager.xlsx");
 
     let workbook;
-    if (!fs.existsSync(excelPath)) {
-      // Create new Excel file if it doesn't exist
+    
+    // Always read existing file if it exists to preserve data
+    if (fs.existsSync(excelPath)) {
+      try {
+        workbook = XLSX.readFile(excelPath);
+        console.log(`Read existing workbook from ${excelPath}`);
+      } catch (readError) {
+        console.error(`Error reading existing file, creating new: ${readError.message}`);
+        workbook = XLSX.utils.book_new();
+      }
+    } else {
       workbook = XLSX.utils.book_new();
       console.log(`Creating new workbook at ${excelPath}`);
-    } else {
-      // Read existing workbook
-      workbook = XLSX.readFile(excelPath);
-      console.log(`Read existing workbook from ${excelPath}`);
     }
 
-    // Check if sheet exists; if not, create it
-    if (!workbook.Sheets[sheetName]) {
+    // Prepare data: headers + new rows
+    const data = [headers, ...rows];
+
+    // Create worksheet from data
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+    // Add or update the sheet
+    if (!workbook.SheetNames.includes(sheetName)) {
       workbook.SheetNames.push(sheetName);
-      // Create new sheet with headers + new rows
-      const data = [headers, ...rows];
-      const worksheet = XLSX.utils.aoa_to_sheet(data);
-      workbook.Sheets[sheetName] = worksheet;
-      console.log(`Created new sheet "${sheetName}" with ${rows.length} rows`);
-    } else {
-      // Sheet exists - APPEND rows instead of replacing
-      const existingSheet = workbook.Sheets[sheetName];
-      
-      // Convert existing sheet to array of arrays
-      const existingData = XLSX.utils.sheet_to_json(existingSheet, { header: 1 });
-      
-      // Remove header from existing data (first row)
-      const existingRows = existingData.slice(1);
-      
-      console.log(`Existing sheet has ${existingRows.length} rows`);
-      
-      // Combine existing rows with new rows
-      const allData = [headers, ...existingRows, ...rows];
-      
-      // Create new worksheet with combined data
-      const worksheet = XLSX.utils.aoa_to_sheet(allData);
-      workbook.Sheets[sheetName] = worksheet;
-      
-      console.log(`Appended ${rows.length} new rows. Total now: ${allData.length - 1} rows`);
     }
+    workbook.Sheets[sheetName] = worksheet;
 
-    // Write back to file using proper Node.js method
+    // Write to file
     const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
     fs.writeFileSync(excelPath, excelBuffer);
     
-    console.log(`Successfully wrote to ${excelPath}`);
+    console.log(`Successfully wrote ${rows.length} rows to sheet "${sheetName}" in ${excelPath}`);
 
     res.json({
       success: true,
-      message: `Sheet "${sheetName}" updated with ${rows.length} new rows appended`,
+      message: `Sheet "${sheetName}" updated with ${rows.length} rows`,
       filePath: excelPath
     });
   } catch (error) {
     console.error("Error writing to Excel sheet:", error);
-    res.status(500).json({ error: error.message, details: error.toString() });
+    res.status(500).json({ 
+      error: "Failed to write Excel file",
+      details: error.message 
+    });
   }
 });
 
