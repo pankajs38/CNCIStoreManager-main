@@ -95,17 +95,32 @@ app.post("/api/write-sheet", (req, res) => {
     // Check if sheet exists; if not, create it
     if (!workbook.Sheets[sheetName]) {
       workbook.SheetNames.push(sheetName);
-      workbook.Sheets[sheetName] = {};
+      // Create new sheet with headers + new rows
+      const data = [headers, ...rows];
+      const worksheet = XLSX.utils.aoa_to_sheet(data);
+      workbook.Sheets[sheetName] = worksheet;
+      console.log(`Created new sheet "${sheetName}" with ${rows.length} rows`);
+    } else {
+      // Sheet exists - APPEND rows instead of replacing
+      const existingSheet = workbook.Sheets[sheetName];
+      
+      // Convert existing sheet to array of arrays
+      const existingData = XLSX.utils.sheet_to_json(existingSheet, { header: 1 });
+      
+      // Remove header from existing data (first row)
+      const existingRows = existingData.slice(1);
+      
+      console.log(`Existing sheet has ${existingRows.length} rows`);
+      
+      // Combine existing rows with new rows
+      const allData = [headers, ...existingRows, ...rows];
+      
+      // Create new worksheet with combined data
+      const worksheet = XLSX.utils.aoa_to_sheet(allData);
+      workbook.Sheets[sheetName] = worksheet;
+      
+      console.log(`Appended ${rows.length} new rows. Total now: ${allData.length - 1} rows`);
     }
-
-    // Convert headers and rows to 2D array (header row + data rows)
-    const data = [headers, ...rows];
-
-    // Create new worksheet from data
-    const worksheet = XLSX.utils.aoa_to_sheet(data);
-
-    // Replace the sheet
-    workbook.Sheets[sheetName] = worksheet;
 
     // Write back to file using proper Node.js method
     const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
@@ -115,7 +130,7 @@ app.post("/api/write-sheet", (req, res) => {
 
     res.json({
       success: true,
-      message: `Sheet "${sheetName}" updated with ${rows.length} rows`,
+      message: `Sheet "${sheetName}" updated with ${rows.length} new rows appended`,
       filePath: excelPath
     });
   } catch (error) {
