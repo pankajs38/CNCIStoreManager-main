@@ -78,10 +78,13 @@ app.post("/api/write-sheet", (req, res) => {
       });
     }
 
-    const excelPath = path.join(__dirname, "../public/CNCIStoreManager.xlsx");
+    // Use dist folder for Excel file (served and accessible)
+    const excelPath = path.join(distPath, "CNCIStoreManager.xlsx");
 
     if (!fs.existsSync(excelPath)) {
-      return res.status(404).json({ error: `Excel file not found at ${excelPath}` });
+      // Create new Excel file if it doesn't exist
+      const newWorkbook = XLSX.utils.book_new();
+      XLSX.writeFile(newWorkbook, excelPath);
     }
 
     // Read existing workbook
