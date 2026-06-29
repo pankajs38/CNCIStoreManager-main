@@ -11,8 +11,8 @@ interface AuthState {
   isLoading: boolean;
   lastSynced: string | null;
   sheetData: AllSheetData | null;
-  syncFromSheet: (accessToken: string) => Promise<void>;
-  syncToSheet: (accessToken: string) => Promise<boolean>;
+  syncFromSheet: () => Promise<void>;
+  syncToSheet: () => Promise<boolean>;
   login: (name: string, password: string) => boolean;
   logout: () => void;
   addUser: (user: User) => void;
@@ -24,9 +24,7 @@ interface AuthState {
   adminChangePassword: (userId: string, newPassword: string) => void;
   setPasswordDirect: (userId: string, newPassword: string) => void;
   updateProfile: (id: string, updates: Partial<User>) => void;
-  setAccessToken: (token: string) => void;
   updateSheetData: (updates: Partial<AllSheetData>) => void;
-  accessToken: string | null;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -39,19 +37,16 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       lastSynced: null,
       sheetData: null,
-      accessToken: null,
-
-      setAccessToken: (token) => set({ accessToken: token }),
 
       updateSheetData: (updates) => set((state) => ({
         sheetData: state.sheetData ? { ...state.sheetData, ...updates } : null,
       })),
 
-      syncFromSheet: async (accessToken: string) => {
+      syncFromSheet: async () => {
         set({ isLoading: true });
         try {
-          console.log("Starting full sync from Google Sheets...");
-          const allData = await syncAllData(accessToken);
+          console.log("Starting full sync from local Excel...");
+          const allData = await syncAllData();
           console.log("Fetched all data from sheets:", {
             users: allData.users.length,
             tasks: allData.tasks.length,
@@ -70,37 +65,37 @@ export const useAuthStore = create<AuthState>()(
             lastSynced: new Date().toISOString(),
             isLoading: false 
           });
-          console.log(`Synced all data from Google Sheets`);
+          console.log(`Loaded all data from local Excel`);
         } catch (error) {
           set({ isLoading: false });
-          console.error("Failed to sync from sheet:", error);
+          console.error("Failed to load data from local Excel:", error);
           // Keep existing data on error
         }
       },
 
-      syncToSheet: async (accessToken: string) => {
+      syncToSheet: async () => {
         const { sheetData, users } = get();
         if (!sheetData) {
-          console.warn("No sheet data to sync to Google Sheets");
+          console.warn("No sheet data to sync");
           return false;
         }
         
         try {
-          console.log("Syncing all data back to Google Sheets...");
-          const result = await syncAllDataToSheet(accessToken, {
+          console.log("Syncing all data to local persistence mode...");
+          const result = await syncAllDataToSheet(undefined, {
             ...sheetData,
             users,
           });
           
           const allSuccess = Object.values(result).every(v => v);
           if (allSuccess) {
-            console.log("Successfully synced all data to Google Sheets");
+            console.log("Successfully applied local persistence mode sync");
           } else {
-            console.error("Partial sync to Google Sheets:", result);
+            console.error("Partial local sync result:", result);
           }
           return allSuccess;
         } catch (error) {
-          console.error("Failed to sync to sheet:", error);
+          console.error("Failed to sync to local persistence mode:", error);
           return false;
         }
       },
@@ -172,16 +167,13 @@ export const useAuthStore = create<AuthState>()(
     { 
       name: "cnci-auth",
       partialize: (state) => ({ 
-        accessToken: state.accessToken,
         lastSynced: state.lastSynced,
         users: state.users,
         sheetData: state.sheetData
       }),
       onRehydrateStorage: () => (state) => {
-        // Log token status on rehydration
         if (state) {
-          console.log("Auth store rehydrated, token exists:", !!state.accessToken);
-          console.log("Token value:", state.accessToken ? state.accessToken.substring(0, 20) + "..." : "null");
+          console.log("Auth store rehydrated");
         }
       }
     }

@@ -1,7 +1,6 @@
 // filepath: src/lib/autoSync.ts
-// Auto-sync utility to write changes to Google Sheets automatically
+// Auto-sync utility to persist local data with debouncing
 
-import { useAuthStore } from "@/stores/authStore";
 import { useTaskStore } from "@/stores/taskStore";
 import { useFileStore } from "@/stores/fileStore";
 import { useTenderStore } from "@/stores/tenderStore";
@@ -15,7 +14,7 @@ let isSyncing = false;
 const SYNC_DELAY = 2000; // 2 seconds
 
 /**
- * Trigger auto-sync to Google Sheets with debouncing
+ * Trigger auto-sync with debouncing
  * Multiple rapid changes will be batched into a single sync
  */
 export const triggerAutoSync = async (source: string) => {
@@ -31,7 +30,7 @@ export const triggerAutoSync = async (source: string) => {
 };
 
 /**
- * Perform the actual sync to Google Sheets
+ * Perform the actual sync to local persistence
  */
 const performAutoSync = async (source: string) => {
   // Prevent concurrent syncs
@@ -40,17 +39,11 @@ const performAutoSync = async (source: string) => {
     return;
   }
   
-  const accessToken = useAuthStore.getState().accessToken;
-  if (!accessToken) {
-    console.warn("Auto-sync: No access token, cannot sync");
-    return;
-  }
-  
   isSyncing = true;
   console.log(`Auto-sync: Starting sync triggered by ${source}...`);
   
   try {
-    // Sync all stores that have changes
+    // Sync all stores that have changes to local persistence
     const results = await Promise.allSettled([
       useTaskStore.getState().syncToSheet(),
       useFileStore.getState().syncToSheet(),
@@ -82,12 +75,6 @@ export const forceImmediateSync = async (source: string): Promise<boolean> => {
   if (syncTimer) {
     clearTimeout(syncTimer);
     syncTimer = null;
-  }
-  
-  const accessToken = useAuthStore.getState().accessToken;
-  if (!accessToken) {
-    console.warn("Immediate sync: No access token, cannot sync");
-    return false;
   }
   
   console.log(`Immediate sync: Starting forced sync triggered by ${source}...`);

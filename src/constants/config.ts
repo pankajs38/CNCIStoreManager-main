@@ -4,9 +4,8 @@ export const APP_NAME = "CNCI S&P Manager";
 export const DEPARTMENT = "Store & Purchase";
 export const INSTITUTE = "Chittaranjan National Cancer Institute";
 
-// Google Sheets Configuration
-export const GOOGLE_SHEETS_CONFIG = {
-  spreadsheetId: "1d29dBx1Rwml8IU8c7HeEPpuDoaC_JaHK6UxAdxTJeio",//"CNCIStoreManager", // Your Google Sheet name/ID
+// Local Excel sheet configuration
+export const LOCAL_EXCEL_SHEET_CONFIG = {
   usersSheet: "Users",
   tasksSheet: "Tasks",
   filesSheet: "Files",

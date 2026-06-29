@@ -255,23 +255,18 @@ export const useSettingsStore = create<SettingsState>()(
 
       syncToSheet: async () => {
         const { vendors, activityLog, customReminders } = get();
-        const accessToken = useAuthStore.getState().accessToken;
-        if (!accessToken) {
-          console.warn("No access token for sync to sheet");
-          return false;
-        }
         
         try {
-          console.log("Syncing vendors, activityLog, and customReminders to Google Sheets...");
+          console.log("Syncing vendors, activityLog, and customReminders in local persistence mode...");
           const [vendorsResult, activityResult, remindersResult] = await Promise.all([
-            writeVendors(accessToken, vendors),
-            writeActivityLogs(accessToken, activityLog),
-            writeCustomReminders(accessToken, customReminders),
+            writeVendors(undefined, vendors),
+            writeActivityLogs(undefined, activityLog),
+            writeCustomReminders(undefined, customReminders),
           ]);
           
           const success = vendorsResult && activityResult && remindersResult;
           if (success) {
-            console.log("Successfully synced vendors, activityLog, and customReminders to Google Sheets");
+            console.log("Successfully synced vendors, activityLog, and customReminders in local persistence mode");
           } else {
             console.error("Partial sync for vendors/activityLog/customReminders:", { vendorsResult, activityResult, remindersResult });
           }

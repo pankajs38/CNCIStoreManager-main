@@ -1,12 +1,8 @@
-import { lazy, Suspense, useEffect, useState, useRef } from "react";
-import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuthStore } from "@/stores/authStore";
 import { Toaster } from "@/components/ui/toaster";
-import { handleOAuthCallback } from "@/lib/googleAuth";
-import { useTaskStore } from "@/stores/taskStore";
-import { useTenderStore } from "@/stores/tenderStore";
-import { useFileStore } from "@/stores/fileStore";
 
 const Login = lazy(() => import("@/pages/Login"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
@@ -37,98 +33,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// OAuth callback handler component - processes the OAuth code and redirects
-function OAuthCallback() {
-  const navigate = useNavigate();
-  const { setAccessToken, syncFromSheet } = useAuthStore();
-  const [error, setError] = useState<string | null>(null);
-  const hasProcessedRef = useRef(false);
-
-  useEffect(() => {
-    const parseCallbackParams = () => {
-      const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
-      const [, query] = hash.split("?", 2);
-      const params = new URLSearchParams(query || "");
-
-      return {
-        accessToken: params.get("access_token"),
-      };
-    };
-
-    const processCallback = async () => {
-      if (hasProcessedRef.current) return;
-      hasProcessedRef.current = true;
-
-      const { accessToken } = parseCallbackParams();
-
-      if (!accessToken) {
-        console.warn("No OAuth access token found, redirecting to login");
-        navigate("/login", { replace: true });
-        return;
-      }
-
-      try {
-        const tokens = await handleOAuthCallback();
-
-        if (tokens) {
-          setAccessToken(tokens.accessToken);
-          await syncFromSheet(tokens.accessToken);
-
-          // Load all data into individual stores
-          useTaskStore.getState().loadFromSheetData();
-          useTenderStore.getState().loadFromSheetData();
-          useFileStore.getState().loadFromSheetData();
-
-          // Redirect to dashboard after successful auth
-          navigate("/dashboard", { replace: true });
-        } else {
-          console.error("Failed to get access token");
-          setError("Authentication failed. Please try again.");
-          // Clear URL params to prevent re-attempt
-          window.history.replaceState({}, document.title, window.location.pathname);
-          setTimeout(() => navigate("/login", { replace: true }), 2000);
-        }
-      } catch (err) {
-        console.error("OAuth callback error:", err);
-        setError("Authentication error. Please try again.");
-        // Clear URL params to prevent re-attempt
-        window.history.replaceState({}, document.title, window.location.pathname);
-        setTimeout(() => navigate("/login", { replace: true }), 2000);
-      }
-    };
-
-    processCallback();
-  }, [navigate, setAccessToken, syncFromSheet]);
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center p-8 bg-white rounded-lg shadow-md">
-          <div className="text-red-500 text-5xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Authentication Error</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Completing authentication...</p>
-      </div>
-    </div>
-  );
-}
-
 export default function App() {
   return (
     <HashRouter>
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/auth/callback" element={<OAuthCallback />} />
           <Route
             element={
               <ProtectedRoute>

@@ -140,7 +140,7 @@ export default function Login() {
               {isLoading && (
                 <div className="bg-blue-50 border border-blue-200 text-blue-700 text-sm px-3 py-2 rounded-lg flex items-center gap-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                  Loading users from Google Sheets...
+                  Loading users from local Excel...
                 </div>
               )}
 

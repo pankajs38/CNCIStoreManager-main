@@ -11,7 +11,6 @@ import { useReminders } from "@/hooks/useReminders";
 import { TaskSummaryBar } from "@/components/features/TaskSummaryBar";
 import { TaskDueAlerts } from "@/components/features/TaskDueAlerts";
 import { TenderStageBadge } from "@/components/features/StatusBadge";
-import { initiateGoogleOAuth, isOAuthConfigured } from "@/lib/googleAuth";
 import {
   Tooltip,
   TooltipContent,
@@ -23,7 +22,7 @@ const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "Ju
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { currentUser, users, accessToken, syncFromSheet, lastSynced, isLoading } = useAuthStore();
+  const { currentUser, users, syncFromSheet, lastSynced, isLoading } = useAuthStore();
   const { tasks } = useTaskStore();
   const { files } = useFileStore();
   const { tenders, contracts } = useTenderStore();
@@ -32,21 +31,21 @@ export default function Dashboard() {
   const [initialSyncDone, setInitialSyncDone] = useState(false);
   useReminders();
 
-  // Auto-sync on mount if we have a token but no data loaded
+  // Auto-load local Excel data on mount when no sync has run yet
   useEffect(() => {
     const doInitialSync = async () => {
-      if (accessToken && users.length === 0 && !initialSyncDone && !isLoading) {
-        console.log("Auto-syncing from Google Sheets on mount...");
+      if (!lastSynced && users.length === 0 && !initialSyncDone && !isLoading) {
+        console.log("Loading data from local Excel on mount...");
         setInitialSyncDone(true);
         try {
-          await syncFromSheet(accessToken);
+          await syncFromSheet();
         } catch (err) {
-          console.error("Initial sync failed:", err);
+          console.error("Initial data load failed:", err);
         }
       }
     };
     doInitialSync();
-  }, [accessToken, users.length, syncFromSheet, initialSyncDone, isLoading]);
+  }, [users.length, syncFromSheet, initialSyncDone, isLoading, lastSynced]);
 
   const activeUsers = useMemo(() => users.filter((u) => u.isActive), [users]);
   const userNamesList = activeUsers.map((u) => `${u.name} (${u.password})`).join(", ");
@@ -54,20 +53,13 @@ export default function Dashboard() {
   // Debug: show all users in console
   console.log("Current users in store:", users);
   console.log("Active users:", activeUsers);
-  console.log("Access token available:", !!accessToken);
 
   const handleSync = async () => {
-    if (!accessToken && isOAuthConfigured()) {
-      initiateGoogleOAuth();
-      return;
-    }
-    if (accessToken) {
-      setIsSyncing(true);
-      try {
-        await syncFromSheet(accessToken);
-      } finally {
-        setIsSyncing(false);
-      }
+    setIsSyncing(true);
+    try {
+      await syncFromSheet();
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -142,7 +134,7 @@ export default function Dashboard() {
       {/* Debug Info - Remove in production */}
       {(isLoading || isSyncing) && (
         <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
-          <p className="font-bold">Syncing users from Google Sheets...</p>
+          <p className="font-bold">Loading users from local Excel...</p>
         </div>
       )}
       {lastSynced && (
@@ -179,7 +171,7 @@ export default function Dashboard() {
             className="gap-2" 
             onClick={handleSync} 
             disabled={isSyncing}
-            title={lastSynced ? `Last synced: ${new Date(lastSynced).toLocaleString()}` : "Sync users from Google Sheets"}
+            title={lastSynced ? `Last loaded: ${new Date(lastSynced).toLocaleString()}` : "Load users from local Excel"}
           >
             <RefreshCw className={`size-4 ${isSyncing ? "animate-spin" : ""}`} /> 
             {isSyncing ? "Syncing..." : "Sync Users"}

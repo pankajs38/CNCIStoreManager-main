@@ -53,24 +53,19 @@ export const useTenderStore = create<TenderState>()(
 
       syncToSheet: async () => {
         const { tenders, contracts } = get();
-        const accessToken = useAuthStore.getState().accessToken;
-        if (!accessToken) {
-          console.warn("No access token for sync to sheet");
-          return false;
-        }
         
         try {
-          console.log("Syncing tenders and contracts to Google Sheets...");
+          console.log("Syncing tenders and contracts in local persistence mode...");
           const [tendersResult, contractsResult] = await Promise.all([
-            writeTenders(accessToken, tenders),
-            writeContracts(accessToken, contracts),
+            writeTenders(undefined, tenders),
+            writeContracts(undefined, contracts),
           ]);
           
           const success = tendersResult && contractsResult;
           if (success) {
-            console.log("Successfully synced tenders and contracts to Google Sheets");
+            console.log("Successfully synced tenders and contracts locally");
           } else {
-            console.error("Partial sync for tenders/contracts:", { tendersResult, contractsResult });
+            console.error("Partial local sync for tenders/contracts:", { tendersResult, contractsResult });
           }
           return success;
         } catch (error) {

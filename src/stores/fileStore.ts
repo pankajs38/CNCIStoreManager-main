@@ -55,19 +55,14 @@ export const useFileStore = create<FileState>()(
 
       syncToSheet: async () => {
         const { files } = get();
-        const accessToken = useAuthStore.getState().accessToken;
-        if (!accessToken) {
-          console.warn("No access token for sync to sheet");
-          return false;
-        }
         
         try {
-          console.log("Syncing files to Google Sheets...");
-          const result = await writeFiles(accessToken, files);
+          console.log("Syncing files in local persistence mode...");
+          const result = await writeFiles(undefined, files);
           if (result) {
-            console.log("Successfully synced files to Google Sheets");
+            console.log("Successfully synced files locally");
           } else {
-            console.error("Failed to sync files to Google Sheets");
+            console.error("Failed to sync files locally");
           }
           return result;
         } catch (error) {

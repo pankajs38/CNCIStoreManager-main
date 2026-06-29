@@ -3,6 +3,8 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import XLSX from "xlsx";
+import fs from "fs";
 
 dotenv.config();
 
@@ -17,6 +19,7 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
 }
 
 const app = express();
+app.use(express.json({ limit: "50mb" }));
 app.use(cookieParser());
 // When running behind a proxy (like Render), trust the proxy so
 // `req.protocol` reflects the original request (http vs https).
@@ -47,101 +50,69 @@ const buildAuthUrl = (req, state) => {
   return authUrl.toString();
 };
 
+// OAuth endpoints disabled for local-only mode
 app.get("/api/auth/start", (req, res) => {
-  const state = Math.random().toString(36).substring(2, 15);
-  res.cookie(COOKIE_STATE_NAME, state, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 10 * 60 * 1000,
-  });
-  res.redirect(buildAuthUrl(req, state));
+  res.status(410).json({ error: "OAuth disabled in local-only mode" });
 });
 
 app.get("/api/auth/callback", async (req, res) => {
-  const { code, state } = req.query;
-  const savedState = req.cookies[COOKIE_STATE_NAME];
-
-  if (!code || !state || state !== savedState) {
-    return res.status(400).send("OAuth callback state mismatch or missing parameters.");
-  }
-
-  res.clearCookie(COOKIE_STATE_NAME);
-
-  try {
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        redirect_uri: getRedirectUri(req),
-        grant_type: "authorization_code",
-      }),
-    });
-
-    const tokenData = await tokenResponse.json();
-
-    if (!tokenResponse.ok) {
-      console.error("Token exchange failed", tokenData);
-      return res.status(500).send("Failed to exchange authorization code for token.");
-    }
-
-    const { access_token: accessToken, refresh_token: refreshToken, expires_in: expiresIn } = tokenData;
-
-    if (refreshToken) {
-      res.cookie(COOKIE_REFRESH_NAME, refreshToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
-    }
-
-    const appOrigin = `${req.protocol}://${req.get("host")}`;
-    return res.redirect(`${appOrigin}/#/auth/callback?access_token=${encodeURIComponent(accessToken)}&expires_in=${encodeURIComponent(expiresIn)}`);
-  } catch (error) {
-    console.error("OAuth callback error", error);
-    return res.status(500).send("OAuth callback processing failed.");
-  }
+  res.status(410).send("OAuth callback endpoint disabled in local-only mode.");
 });
 
 app.get("/api/auth/refresh", async (req, res) => {
-  const refreshToken = req.cookies[COOKIE_REFRESH_NAME];
-
-  if (!refreshToken) {
-    return res.status(401).json({ error: "missing_refresh_token" });
-  }
-
-  try {
-    const response = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        refresh_token: refreshToken,
-        grant_type: "refresh_token",
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      console.error("Refresh token failed", data);
-      return res.status(500).json({ error: "refresh_failed" });
-    }
-
-    return res.json({ access_token: data.access_token, expires_in: data.expires_in });
-  } catch (error) {
-    console.error("Refresh token request failed", error);
-    return res.status(500).json({ error: "refresh_request_failed" });
-  }
+  res.status(410).json({ error: "OAuth refresh disabled in local-only mode" });
 });
 
 app.post("/api/auth/logout", (req, res) => {
-  res.clearCookie(COOKIE_REFRESH_NAME, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
-  res.json({ ok: true });
+  res.status(410).json({ error: "OAuth/logout disabled in local-only mode" });
+});
+
+// ==================== LOCAL EXCEL WRITE ENDPOINT ====================
+app.post("/api/write-sheet", (req, res) => {
+  try {
+    const { sheetName, headers, rows } = req.body;
+
+    if (!sheetName || !headers || !Array.isArray(rows)) {
+      return res.status(400).json({
+        error: "Missing or invalid parameters: sheetName, headers, rows",
+      });
+    }
+
+    const excelPath = path.join(__dirname, "../public/CNCIStoreManager.xlsx");
+
+    if (!fs.existsSync(excelPath)) {
+      return res.status(404).json({ error: `Excel file not found at ${excelPath}` });
+    }
+
+    // Read existing workbook
+    const workbook = XLSX.readFile(excelPath);
+
+    // Check if sheet exists; if not, create it
+    if (!workbook.Sheets[sheetName]) {
+      workbook.SheetNames.push(sheetName);
+      workbook.Sheets[sheetName] = {};
+    }
+
+    // Convert headers and rows to 2D array (header row + data rows)
+    const data = [headers, ...rows];
+
+    // Create new worksheet from data
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+    // Replace the sheet
+    workbook.Sheets[sheetName] = worksheet;
+
+    // Write back to file
+    XLSX.writeFile(workbook, excelPath);
+
+    res.json({
+      success: true,
+      message: `Sheet "${sheetName}" updated with ${rows.length} rows`,
+    });
+  } catch (error) {
+    console.error("Error writing to Excel sheet:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.use(express.static(distPath));
@@ -149,7 +120,7 @@ app.get("/*", (req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

@@ -7,7 +7,13 @@ export default defineConfig({
   server: {
     host: "::",
     port: 8080,
-    allowedHosts: ["cncistoremanager.onrender.com", "cncistoremanager-main.onrender.com", "localhost"]
+    allowedHosts: ["cncistoremanager.onrender.com", "cncistoremanager-main.onrender.com", "localhost"],
+    proxy: {
+      "/api": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+    },
   },
   plugins: [
     react(),

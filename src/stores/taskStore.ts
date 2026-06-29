@@ -86,25 +86,20 @@ export const useTaskStore = create<TaskState>()(
 
       syncToSheet: async () => {
         const { tasks, monthlySheets, generalTasks } = get();
-        const accessToken = useAuthStore.getState().accessToken;
-        if (!accessToken) {
-          console.warn("No access token for sync to sheet");
-          return false;
-        }
         
         try {
-          console.log("Syncing tasks, monthlySheets, and generalTasks to Google Sheets...");
+          console.log("Syncing tasks, monthlySheets, and generalTasks in local persistence mode...");
           const [tasksResult, monthlyResult, generalTasksResult] = await Promise.all([
-            writeTasks(accessToken, tasks),
-            writeMonthlySheets(accessToken, monthlySheets),
-            writeGeneralTasks(accessToken, generalTasks),
+            writeTasks(undefined, tasks),
+            writeMonthlySheets(undefined, monthlySheets),
+            writeGeneralTasks(undefined, generalTasks),
           ]);
           
           const success = tasksResult && monthlyResult && generalTasksResult;
           if (success) {
-            console.log("Successfully synced tasks, monthlySheets, and generalTasks to Google Sheets");
+            console.log("Successfully synced tasks, monthlySheets, and generalTasks locally");
           } else {
-            console.error("Partial sync for tasks/monthlySheets/generalTasks:", { tasksResult, monthlyResult, generalTasksResult });
+            console.error("Partial local sync for tasks/monthlySheets/generalTasks:", { tasksResult, monthlyResult, generalTasksResult });
           }
           return success;
         } catch (error) {

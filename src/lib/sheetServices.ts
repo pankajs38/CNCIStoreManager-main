@@ -1,16 +1,43 @@
 // filepath: src/lib/sheetServices.ts
-import { GOOGLE_SHEETS_CONFIG } from "@/constants/config";
+import { LOCAL_EXCEL_SHEET_CONFIG } from "@/constants/config";
 import { generateId } from "./utils";
-import { getBackendBase } from "@/lib/googleAuth";
-import type { 
+import * as XLSX from "xlsx";
+import type {
   User, Task, FileRecord, TenderRecord, ContractRecord, Vendor, 
   MonthlySheet, MonthlySheetItem, Reminder, ActivityLogEntry,
   TaskStatus, TaskType, TaskPriority, GFRType, Campus, FileNumberCode,
   CaseType, TenderCaseType, MonthlyItemStatus, TenderStage
 } from "@/types";
 
-const SPREADSHEET_ID = GOOGLE_SHEETS_CONFIG.spreadsheetId;
-const GOOGLE_SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+const LOCAL_EXCEL_PATH = "/CNCIStoreManager.xlsx";
+
+const getLocalWorkbook = async (): Promise<XLSX.WorkBook> => {
+  const response = await fetch(LOCAL_EXCEL_PATH);
+  if (!response.ok) {
+    throw new Error(`Failed to load local Excel workbook at ${LOCAL_EXCEL_PATH}: ${response.status}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return XLSX.read(arrayBuffer, { type: "array", cellDates: false, raw: false });
+};
+
+const getSheetRows = (workbook: XLSX.WorkBook, sheetName: string): string[][] => {
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) {
+    console.warn(`Sheet not found: ${sheetName}`);
+    return [];
+  }
+
+  const rows = XLSX.utils.sheet_to_json<string[]>(sheet, {
+    header: 1,
+    blankrows: false,
+    raw: false,
+  });
+
+  return rows.map((row) =>
+    row.map((cell) => (cell === undefined || cell === null ? "" : String(cell)))
+  );
+};
 
 // Helper to parse boolean
 const parseBoolean = (value: string | boolean | undefined): boolean => {
@@ -48,91 +75,32 @@ const parseArray = <T>(value: string | undefined, defaultValue: T[]): T[] => {
   }
 };
 
-// Generic fetch function
-export const fetchSheetData = async (accessToken: string, sheetName: string): Promise<string[][]> => {
-  if (!accessToken) {
-    console.error(`No access token provided for sheet ${sheetName}`);
-    return [];
-  }
-  
+// Generic fetch function against local Excel workbook
+export const fetchSheetData = async (_accessToken?: string, sheetName: string): Promise<string[][]> => {
   try {
-    const tryFetch = async (token: string) => {
-      const response = await fetch(
-        `${GOOGLE_SHEETS_API}/${SPREADSHEET_ID}/values/${sheetName}!A:ZZ`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      return response;
-    };
-
-    let response = await tryFetch(accessToken);
-
-    if (response.status === 401) {
-      try {
-        const refreshResponse = await fetch(`${getBackendBase()}/api/auth/refresh`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json();
-          const newAccessToken = refreshData.access_token;
-          console.log("Token refreshed successfully");
-          response = await tryFetch(newAccessToken);
-        } else {
-          console.error("Failed to refresh token via backend");
-        }
-      } catch (error) {
-        console.error("Error refreshing token via backend:", error);
-      }
-    }
-
-    if (!response.ok) {
-      console.error(`Failed to fetch sheet ${sheetName}:`, response.status, response.statusText);
-      return [];
-    }
-
-    const data = await response.json();
-    if (!data.values || data.values.length < 2) {
-      return [];
-    }
-
-    return data.values.slice(1) as string[][]; // Skip header row
+    const workbook = await getLocalWorkbook();
+    const rows = getSheetRows(workbook, sheetName);
+    return rows.slice(1); // Skip header row
   } catch (error) {
-    console.error(`Error fetching sheet ${sheetName}:`, error);
+    console.error(`Error reading local Excel sheet ${sheetName}:`, error);
     return [];
   }
 };
 
-// Fetch headers
-export const fetchSheetHeaders = async (accessToken: string, sheetName: string): Promise<string[]> => {
+// Fetch headers from local Excel workbook
+export const fetchSheetHeaders = async (_accessToken?: string, sheetName: string): Promise<string[]> => {
   try {
-    const response = await fetch(
-      `${GOOGLE_SHEETS_API}/${SPREADSHEET_ID}/values/${sheetName}!1:1`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) return [];
-    const data = await response.json();
-    return (data.values?.[0] as string[]) || [];
-  } catch {
+    const workbook = await getLocalWorkbook();
+    const rows = getSheetRows(workbook, sheetName);
+    return rows[0] || [];
+  } catch (error) {
+    console.error(`Error reading headers for local Excel sheet ${sheetName}:`, error);
     return [];
   }
 };
 
 // ==================== USERS ====================
-export interface GoogleSheetUser {
+export interface ExcelSheetUser {
   id: string;
   name: string;
   designation: string;
@@ -149,11 +117,11 @@ export interface GoogleSheetUser {
 }
 
 export const fetchUsers = async (accessToken: string): Promise<User[]> => {
-  const rows = await fetchSheetData(accessToken, GOOGLE_SHEETS_CONFIG.usersSheet);
-  const headers = await fetchSheetHeaders(accessToken, GOOGLE_SHEETS_CONFIG.usersSheet);
+  const rows = await fetchSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.usersSheet);
+  const headers = await fetchSheetHeaders(accessToken, LOCAL_EXCEL_SHEET_CONFIG.usersSheet);
   
   return rows.map(row => {
-    const user: GoogleSheetUser = {
+    const user: ExcelSheetUser = {
       id: "", name: "", designation: "", role: "user", password: "",
       canCreateTender: false, isActive: true
     };
@@ -184,8 +152,8 @@ export const fetchUsers = async (accessToken: string): Promise<User[]> => {
 
 // ==================== TASKS ====================
 export const fetchTasks = async (accessToken: string): Promise<Task[]> => {
-  const rows = await fetchSheetData(accessToken, GOOGLE_SHEETS_CONFIG.tasksSheet);
-  const headers = await fetchSheetHeaders(accessToken, GOOGLE_SHEETS_CONFIG.tasksSheet);
+  const rows = await fetchSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.tasksSheet);
+  const headers = await fetchSheetHeaders(accessToken, LOCAL_EXCEL_SHEET_CONFIG.tasksSheet);
   
   return rows.map(row => {
     const task: Partial<Task> = {};
@@ -232,8 +200,8 @@ export const fetchTasks = async (accessToken: string): Promise<Task[]> => {
 
 // ==================== FILES ====================
 export const fetchFiles = async (accessToken: string): Promise<FileRecord[]> => {
-  const rows = await fetchSheetData(accessToken, GOOGLE_SHEETS_CONFIG.filesSheet);
-  const headers = await fetchSheetHeaders(accessToken, GOOGLE_SHEETS_CONFIG.filesSheet);
+  const rows = await fetchSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.filesSheet);
+  const headers = await fetchSheetHeaders(accessToken, LOCAL_EXCEL_SHEET_CONFIG.filesSheet);
   
   return rows.map(row => {
     const file: Partial<FileRecord> = {};
@@ -293,8 +261,8 @@ export const fetchFiles = async (accessToken: string): Promise<FileRecord[]> => 
 
 // ==================== TENDERS ====================
 export const fetchTenders = async (accessToken: string): Promise<TenderRecord[]> => {
-  const rows = await fetchSheetData(accessToken, GOOGLE_SHEETS_CONFIG.tendersSheet);
-  const headers = await fetchSheetHeaders(accessToken, GOOGLE_SHEETS_CONFIG.tendersSheet);
+  const rows = await fetchSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.tendersSheet);
+  const headers = await fetchSheetHeaders(accessToken, LOCAL_EXCEL_SHEET_CONFIG.tendersSheet);
   
   return rows.map(row => {
     const tender: Partial<TenderRecord> = {};
@@ -345,8 +313,8 @@ export const fetchTenders = async (accessToken: string): Promise<TenderRecord[]>
 
 // ==================== CONTRACTS ====================
 export const fetchContracts = async (accessToken: string): Promise<ContractRecord[]> => {
-  const rows = await fetchSheetData(accessToken, GOOGLE_SHEETS_CONFIG.contractsSheet);
-  const headers = await fetchSheetHeaders(accessToken, GOOGLE_SHEETS_CONFIG.contractsSheet);
+  const rows = await fetchSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.contractsSheet);
+  const headers = await fetchSheetHeaders(accessToken, LOCAL_EXCEL_SHEET_CONFIG.contractsSheet);
   
   return rows.map(row => {
     const contract: Partial<ContractRecord> = {};
@@ -379,8 +347,8 @@ export const fetchContracts = async (accessToken: string): Promise<ContractRecor
 
 // ==================== VENDORS ====================
 export const fetchVendors = async (accessToken: string): Promise<Vendor[]> => {
-  const rows = await fetchSheetData(accessToken, GOOGLE_SHEETS_CONFIG.vendorsSheet);
-  const headers = await fetchSheetHeaders(accessToken, GOOGLE_SHEETS_CONFIG.vendorsSheet);
+  const rows = await fetchSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.vendorsSheet);
+  const headers = await fetchSheetHeaders(accessToken, LOCAL_EXCEL_SHEET_CONFIG.vendorsSheet);
   
   return rows.map(row => {
     const vendor: Partial<Vendor> = {};
@@ -410,8 +378,8 @@ export const fetchVendors = async (accessToken: string): Promise<Vendor[]> => {
 
 // ==================== MONTHLY SHEETS ====================
 export const fetchMonthlySheets = async (accessToken: string): Promise<MonthlySheet[]> => {
-  const rows = await fetchSheetData(accessToken, GOOGLE_SHEETS_CONFIG.monthlySheetsSheet);
-  const headers = await fetchSheetHeaders(accessToken, GOOGLE_SHEETS_CONFIG.monthlySheetsSheet);
+  const rows = await fetchSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.monthlySheetsSheet);
+  const headers = await fetchSheetHeaders(accessToken, LOCAL_EXCEL_SHEET_CONFIG.monthlySheetsSheet);
   
   return rows.map(row => {
     const sheet: Partial<MonthlySheet> = {};
@@ -443,8 +411,8 @@ export const fetchMonthlySheets = async (accessToken: string): Promise<MonthlySh
 
 // ==================== REMINDERS ====================
 export const fetchReminders = async (accessToken: string): Promise<Reminder[]> => {
-  const rows = await fetchSheetData(accessToken, GOOGLE_SHEETS_CONFIG.remindersSheet);
-  const headers = await fetchSheetHeaders(accessToken, GOOGLE_SHEETS_CONFIG.remindersSheet);
+  const rows = await fetchSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.remindersSheet);
+  const headers = await fetchSheetHeaders(accessToken, LOCAL_EXCEL_SHEET_CONFIG.remindersSheet);
   
   return rows.map(row => {
     const reminder: Partial<Reminder> = {};
@@ -474,8 +442,8 @@ export const fetchReminders = async (accessToken: string): Promise<Reminder[]> =
 
 // ==================== ACTIVITY LOGS ====================
 export const fetchActivityLogs = async (accessToken: string): Promise<ActivityLogEntry[]> => {
-  const rows = await fetchSheetData(accessToken, GOOGLE_SHEETS_CONFIG.activityLogsSheet);
-  const headers = await fetchSheetHeaders(accessToken, GOOGLE_SHEETS_CONFIG.activityLogsSheet);
+  const rows = await fetchSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.activityLogsSheet);
+  const headers = await fetchSheetHeaders(accessToken, LOCAL_EXCEL_SHEET_CONFIG.activityLogsSheet);
   
   return rows.map(row => {
     const log: Partial<ActivityLogEntry> = {};
@@ -514,16 +482,16 @@ export interface AllSheetData {
   activityLogs: ActivityLogEntry[];
 }
 
-export const syncAllData = async (accessToken: string): Promise<AllSheetData> => {
-  const users = await fetchUsers(accessToken);
-  const tasks = await fetchTasks(accessToken);
-  const files = await fetchFiles(accessToken);
-  const tenders = await fetchTenders(accessToken);
-  const contracts = await fetchContracts(accessToken);
-  const vendors = await fetchVendors(accessToken);
-  const monthlySheets = await fetchMonthlySheets(accessToken);
-  const reminders = await fetchReminders(accessToken);
-  const activityLogs = await fetchActivityLogs(accessToken);
+export const syncAllData = async (_accessToken?: string): Promise<AllSheetData> => {
+  const users = await fetchUsers(_accessToken);
+  const tasks = await fetchTasks(_accessToken);
+  const files = await fetchFiles(_accessToken);
+  const tenders = await fetchTenders(_accessToken);
+  const contracts = await fetchContracts(_accessToken);
+  const vendors = await fetchVendors(_accessToken);
+  const monthlySheets = await fetchMonthlySheets(_accessToken);
+  const reminders = await fetchReminders(_accessToken);
+  const activityLogs = await fetchActivityLogs(_accessToken);
 
   return {
     users,
@@ -540,84 +508,28 @@ export const syncAllData = async (accessToken: string): Promise<AllSheetData> =>
 
 // ==================== WRITE FUNCTIONS ====================
 
-// Helper to convert column number to letter (1=A, 2=B, ..., 26=Z, 27=AA, etc.)
-const getColumnLetter = (num: number): string => {
-  if (num <= 0) return 'A';
-  let result = '';
-  while (num > 0) {
-    num--;
-    result = String.fromCharCode(65 + (num % 26)) + result;
-    num = Math.floor(num / 26);
-  }
-  return result;
-};
+// Generic write function to update entire sheet via backend API
+const writeSheetData = async (_accessToken: string | undefined, sheetName: string, headers: string[], rows: string[][]): Promise<boolean> => {
+  try {
+    const response = await fetch("/api/write-sheet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sheetName, headers, rows }),
+    });
 
-// Generic write function to update entire sheet
-const writeSheetData = async (accessToken: string, sheetName: string, headers: string[], rows: string[][]): Promise<boolean> => {
-  if (!accessToken) {
-    console.error(`No access token provided for writing to sheet ${sheetName}`);
-    return false;
-  }
-  
-  const tryWrite = async (token: string) => {
-    const values = [headers, ...rows];
-    console.log(`Writing to sheet "${sheetName}": ${rows.length} rows, ${headers.length} columns`);
-    
-    // Calculate the actual range needed based on number of columns
-    const numCols = headers.length;
-    const endCol = getColumnLetter(numCols);
-    const range = `A:${endCol}`;
-    
-    console.log(`Writing to range: ${sheetName}!${range}`);
-    
-    const response = await fetch(
-      `${GOOGLE_SHEETS_API}/${SPREADSHEET_ID}/values/${sheetName}!${range}?valueInputOption=USER_ENTERED`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ values }),
-      }
-    );
-
-    return response;
-  };
-
-  let response = await tryWrite(accessToken);
-
-  if (response.status === 401) {
-      try {
-        const refreshResponse = await fetch(`${getBackendBase()}/api/auth/refresh`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json();
-          const newAccessToken = refreshData.access_token;
-          console.log("Token refreshed successfully for write");
-          response = await tryWrite(newAccessToken);
-        } else {
-          console.error("Failed to refresh token via backend for write");
-        }
-      } catch (error) {
-        console.error("Error refreshing token via backend for write:", error);
-      }
+    if (!response.ok) {
+      const error = await response.json();
+      console.error(`Failed to write sheet "${sheetName}":`, error);
+      return false;
     }
 
-  const responseText = await response.text();
-  console.log(`Write response for "${sheetName}":`, response.status, responseText);
-
-  if (!response.ok) {
-    console.error(`Failed to write to sheet ${sheetName}:`, response.status, responseText);
+    const result = await response.json();
+    console.log(`✓ Sheet "${sheetName}" updated successfully:`, result);
+    return true;
+  } catch (error) {
+    console.error(`Error writing to sheet "${sheetName}":`, error);
     return false;
   }
-
-  return true;
 };
 
 // ==================== WRITE USERS ====================
@@ -639,9 +551,9 @@ const userToRow = (user: User): string[] => [
   user.department || "",
 ];
 
-export const writeUsers = async (accessToken: string, users: User[]): Promise<boolean> => {
+export const writeUsers = async (accessToken?: string, users: User[]): Promise<boolean> => {
   const rows = users.map(userToRow);
-  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.usersSheet, USER_HEADERS, rows);
+  return writeSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.usersSheet, USER_HEADERS, rows);
 };
 
 // ==================== WRITE TASKS ====================
@@ -671,9 +583,9 @@ const taskToRow = (task: Task): string[] => [
   JSON.stringify(task.transferHistory || []),
 ];
 
-export const writeTasks = async (accessToken: string, tasks: Task[]): Promise<boolean> => {
+export const writeTasks = async (accessToken?: string, tasks: Task[]): Promise<boolean> => {
   const rows = tasks.map(taskToRow);
-  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.tasksSheet, TASK_HEADERS, rows);
+  return writeSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.tasksSheet, TASK_HEADERS, rows);
 };
 
 // ==================== WRITE FILES ====================
@@ -719,9 +631,9 @@ const fileToRow = (file: FileRecord): string[] => [
   file.dataScannedAt || "",
 ];
 
-export const writeFiles = async (accessToken: string, files: FileRecord[]): Promise<boolean> => {
+export const writeFiles = async (accessToken?: string, files: FileRecord[]): Promise<boolean> => {
   const rows = files.map(fileToRow);
-  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.filesSheet, FILE_HEADERS, rows);
+  return writeSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.filesSheet, FILE_HEADERS, rows);
 };
 
 // ==================== WRITE TENDERS ====================
@@ -757,9 +669,9 @@ const tenderToRow = (tender: TenderRecord): string[] => [
   JSON.stringify(tender.awardedItems || []),
 ];
 
-export const writeTenders = async (accessToken: string, tenders: TenderRecord[]): Promise<boolean> => {
+export const writeTenders = async (accessToken?: string, tenders: TenderRecord[]): Promise<boolean> => {
   const rows = tenders.map(tenderToRow);
-  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.tendersSheet, TENDER_HEADERS, rows);
+  return writeSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.tendersSheet, TENDER_HEADERS, rows);
 };
 
 // ==================== WRITE CONTRACTS ====================
@@ -781,9 +693,9 @@ const contractToRow = (contract: ContractRecord): string[] => [
   JSON.stringify(contract.awardedItems || []),
 ];
 
-export const writeContracts = async (accessToken: string, contracts: ContractRecord[]): Promise<boolean> => {
+export const writeContracts = async (accessToken?: string, contracts: ContractRecord[]): Promise<boolean> => {
   const rows = contracts.map(contractToRow);
-  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.contractsSheet, CONTRACT_HEADERS, rows);
+  return writeSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.contractsSheet, CONTRACT_HEADERS, rows);
 };
 
 // ==================== WRITE VENDORS ====================
@@ -802,9 +714,9 @@ const vendorToRow = (vendor: Vendor): string[] => [
   vendor.addedAt || "",
 ];
 
-export const writeVendors = async (accessToken: string, vendors: Vendor[]): Promise<boolean> => {
+export const writeVendors = async (accessToken?: string, vendors: Vendor[]): Promise<boolean> => {
   const rows = vendors.map(vendorToRow);
-  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.vendorsSheet, VENDOR_HEADERS, rows);
+  return writeSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.vendorsSheet, VENDOR_HEADERS, rows);
 };
 
 // ==================== WRITE MONTHLY SHEETS ====================
@@ -823,9 +735,9 @@ const monthlySheetToRow = (sheet: MonthlySheet): string[] => [
   sheet.updatedAt || "",
 ];
 
-export const writeMonthlySheets = async (accessToken: string, monthlySheets: MonthlySheet[]): Promise<boolean> => {
+export const writeMonthlySheets = async (accessToken?: string, monthlySheets: MonthlySheet[]): Promise<boolean> => {
   const rows = monthlySheets.map(monthlySheetToRow);
-  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.monthlySheetsSheet, MONTHLY_SHEET_HEADERS, rows);
+  return writeSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.monthlySheetsSheet, MONTHLY_SHEET_HEADERS, rows);
 };
 
 // ==================== WRITE REMINDERS ====================
@@ -843,9 +755,9 @@ const reminderToRow = (reminder: Reminder): string[] => [
   String(reminder.isCompleted || false),
 ];
 
-export const writeReminders = async (accessToken: string, reminders: Reminder[]): Promise<boolean> => {
+export const writeReminders = async (accessToken?: string, reminders: Reminder[]): Promise<boolean> => {
   const rows = reminders.map(reminderToRow);
-  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.remindersSheet, REMINDER_HEADERS, rows);
+  return writeSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.remindersSheet, REMINDER_HEADERS, rows);
 };
 
 // ==================== WRITE ACTIVITY LOGS ====================
@@ -862,9 +774,9 @@ const activityLogToRow = (log: ActivityLogEntry): string[] => [
   log.relatedId || "",
 ];
 
-export const writeActivityLogs = async (accessToken: string, activityLogs: ActivityLogEntry[]): Promise<boolean> => {
+export const writeActivityLogs = async (accessToken?: string, activityLogs: ActivityLogEntry[]): Promise<boolean> => {
   const rows = activityLogs.map(activityLogToRow);
-  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.activityLogsSheet, ACTIVITY_LOG_HEADERS, rows);
+  return writeSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.activityLogsSheet, ACTIVITY_LOG_HEADERS, rows);
 };
 
 // ==================== WRITE GENERAL TASKS ====================
@@ -884,9 +796,9 @@ const generalTaskToRow = (task: any): string[] => [
   JSON.stringify(task.remarks || []),
 ];
 
-export const writeGeneralTasks = async (accessToken: string, generalTasks: any[]): Promise<boolean> => {
+export const writeGeneralTasks = async (accessToken?: string, generalTasks: any[]): Promise<boolean> => {
   const rows = generalTasks.map(generalTaskToRow);
-  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.generalTasksSheet, GENERAL_TASK_HEADERS, rows);
+  return writeSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.generalTasksSheet, GENERAL_TASK_HEADERS, rows);
 };
 
 // ==================== WRITE CUSTOM REMINDERS ====================
@@ -905,9 +817,9 @@ const customReminderToRow = (reminder: any): string[] => [
   reminder.linkedLabel || "",
 ];
 
-export const writeCustomReminders = async (accessToken: string, customReminders: any[]): Promise<boolean> => {
+export const writeCustomReminders = async (accessToken?: string, customReminders: any[]): Promise<boolean> => {
   const rows = customReminders.map(customReminderToRow);
-  return writeSheetData(accessToken, GOOGLE_SHEETS_CONFIG.remindersSheet, CUSTOM_REMINDER_HEADERS, rows);
+  return writeSheetData(accessToken, LOCAL_EXCEL_SHEET_CONFIG.remindersSheet, CUSTOM_REMINDER_HEADERS, rows);
 };
 
 // ==================== SYNC ALL DATA TO SHEETS ====================
@@ -924,10 +836,10 @@ export interface SyncToSheetResult {
 }
 
 export const syncAllDataToSheet = async (
-  accessToken: string,
+  accessToken?: string,
   data: AllSheetData
 ): Promise<SyncToSheetResult> => {
-  console.log("Writing all data to Google Sheets...", {
+  console.log("Applying all data to local persistence mode...", {
     users: data.users?.length || 0,
     tasks: data.tasks?.length || 0,
     files: data.files?.length || 0,

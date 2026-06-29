@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UserPlus, Shield, Save, FileText, Trash2, Pencil, Lock, Download, Upload, Users, Hash, Cloud, CloudOff, RefreshCw } from "lucide-react";
+import { UserPlus, Shield, Save, FileText, Trash2, Pencil, Lock, Download, Users, Hash, RefreshCw, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,11 +13,11 @@ import { useFileStore } from "@/stores/fileStore";
 import { useTenderStore } from "@/stores/tenderStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { FILE_NUMBER_MAP } from "@/constants/config";
-import { generateId, generateSampleExcel } from "@/lib/utils";
+import { generateId } from "@/lib/utils";
 import type { User } from "@/types";
 
 export default function Settings() {
-  const { currentUser, users, addUser, updateUser, removeUser, changePassword, adminChangePassword } = useAuthStore();
+  const { currentUser, users, addUser, updateUser, removeUser, changePassword, adminChangePassword, syncFromSheet, lastSynced } = useAuthStore();
   const { tasks, generalTasks } = useTaskStore();
   const { files, setContinueNoStart, continueNoStart } = useFileStore();
   const { tenders, contracts } = useTenderStore();
@@ -63,54 +63,24 @@ export default function Settings() {
   const [continueNoCode, setContinueNoCode] = useState("");
   const [continueNoVal, setContinueNoVal] = useState("");
 
-  // Google Sheets sync state
+  // Local Excel sync state
   const [isSyncingToSheet, setIsSyncingToSheet] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const { accessToken, lastSynced, syncToSheet } = useAuthStore();
-  const taskStoreSyncToSheet = useTaskStore((s) => s.syncToSheet);
-  const fileStoreSyncToSheet = useFileStore((s) => s.syncToSheet);
-  const tenderStoreSyncToSheet = useTenderStore((s) => s.syncToSheet);
-
-  const handleSyncToGoogleSheets = async () => {
-    if (!accessToken) {
-      setSyncMessage({ type: "error", text: "Not connected to Google Sheets" });
-      return;
-    }
-
+  const handleReloadLocalData = async () => {
     setIsSyncingToSheet(true);
     setSyncMessage(null);
 
     try {
-      // Sync all data stores to Google Sheets
-      console.log("Starting sync to Google Sheets...");
-      console.log("Access token available:", !!accessToken);
-      
-      const results = await Promise.all([
-        syncToSheet(accessToken),
-        taskStoreSyncToSheet(),
-        fileStoreSyncToSheet(),
-        tenderStoreSyncToSheet(),
-      ]);
-
-      console.log("Sync results:", {
-        authStore: results[0],
-        taskStore: results[1],
-        fileStore: results[2],
-        tenderStore: results[3],
-      });
-
-      const allSuccess = results.every((r) => r);
-      if (allSuccess) {
-        setSyncMessage({ type: "success", text: "All data synced to Google Sheets successfully!" });
-      } else {
-        const failed = ["authStore", "taskStore", "fileStore", "tenderStore"].filter((_, i) => !results[i]);
-        console.error("Failed syncs:", failed);
-        setSyncMessage({ type: "error", text: `Some data failed to sync: ${failed.join(", ")}. Check console for details.` });
-      }
+      console.log("Reloading data from local Excel...");
+      await syncFromSheet();
+      useTaskStore.getState().loadFromSheetData();
+      useFileStore.getState().loadFromSheetData();
+      useTenderStore.getState().loadFromSheetData();
+      setSyncMessage({ type: "success", text: "Data reloaded from local Excel successfully." });
     } catch (error) {
-      console.error("Sync error:", error);
-      setSyncMessage({ type: "error", text: "Failed to sync to Google Sheets" });
+      console.error("Reload error:", error);
+      setSyncMessage({ type: "error", text: "Failed to reload data from local Excel." });
     } finally {
       setIsSyncingToSheet(false);
     }
@@ -440,45 +410,35 @@ export default function Settings() {
 
         {/* DATA MANAGEMENT */}
         <TabsContent value="data" className="space-y-4 mt-0">
-          {/* Google Sheets Sync Section */}
+          {/* Local Excel Data Section */}
           <div className="bg-white rounded-xl border p-5 space-y-4">
-            <h3 className="font-display font-semibold flex items-center gap-2"><Cloud className="size-4 text-gold" /> Google Sheets Sync</h3>
-            <p className="text-xs text-muted-foreground">Sync all data to your Google Sheets. Data will be written to the connected spreadsheet.</p>
+            <h3 className="font-display font-semibold flex items-center gap-2"><Download className="size-4 text-gold" /> Local Excel Data</h3>
+            <p className="text-xs text-muted-foreground">Load application data from the local Excel file at public/CNCIStoreManager.xlsx.</p>
             
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-3">
-                {accessToken ? (
-                  <div className="flex items-center gap-3">
-                    <Cloud className="size-5 text-green-500" />
-                    <div>
-                      <p className="text-sm font-medium">Connected to Google Sheets</p>
-                      <p className="text-xs text-muted-foreground">Last synced: {lastSynced ? new Date(lastSynced).toLocaleString() : "Never"}</p>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <FileText className="size-5 text-green-500" />
+                  <div>
+                    <p className="text-sm font-medium">Local Excel data source</p>
+                    <p className="text-xs text-muted-foreground">Last loaded: {lastSynced ? new Date(lastSynced).toLocaleString() : "Never"}</p>
                   </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <CloudOff className="size-5 text-red-500" />
-                    <div>
-                      <p className="text-sm font-medium">Not connected</p>
-                      <p className="text-xs text-muted-foreground">Sign in to enable sync</p>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
               <Button 
-                onClick={handleSyncToGoogleSheets} 
-                disabled={!accessToken || isSyncingToSheet}
+                onClick={handleReloadLocalData} 
+                disabled={isSyncingToSheet}
                 className="gap-2"
               >
                 {isSyncingToSheet ? (
                   <span className="flex items-center gap-2">
                     <RefreshCw className="size-4 animate-spin" />
-                    Syncing...
+                    Reloading...
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
-                    <Upload className="size-4" />
-                    Sync to Sheets
+                    <Download className="size-4" />
+                    Reload from Excel
                   </span>
                 )}
               </Button>
