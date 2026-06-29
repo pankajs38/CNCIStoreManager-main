@@ -81,14 +81,16 @@ app.post("/api/write-sheet", (req, res) => {
     // Use dist folder for Excel file (served and accessible)
     const excelPath = path.join(distPath, "CNCIStoreManager.xlsx");
 
+    let workbook;
     if (!fs.existsSync(excelPath)) {
       // Create new Excel file if it doesn't exist
-      const newWorkbook = XLSX.utils.book_new();
-      XLSX.writeFile(newWorkbook, excelPath);
+      workbook = XLSX.utils.book_new();
+      console.log(`Creating new workbook at ${excelPath}`);
+    } else {
+      // Read existing workbook
+      workbook = XLSX.readFile(excelPath);
+      console.log(`Read existing workbook from ${excelPath}`);
     }
-
-    // Read existing workbook
-    const workbook = XLSX.readFile(excelPath);
 
     // Check if sheet exists; if not, create it
     if (!workbook.Sheets[sheetName]) {
@@ -105,16 +107,20 @@ app.post("/api/write-sheet", (req, res) => {
     // Replace the sheet
     workbook.Sheets[sheetName] = worksheet;
 
-    // Write back to file
-    XLSX.writeFile(workbook, excelPath);
+    // Write back to file using proper Node.js method
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
+    fs.writeFileSync(excelPath, excelBuffer);
+    
+    console.log(`Successfully wrote to ${excelPath}`);
 
     res.json({
       success: true,
       message: `Sheet "${sheetName}" updated with ${rows.length} rows`,
+      filePath: excelPath
     });
   } catch (error) {
     console.error("Error writing to Excel sheet:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message, details: error.toString() });
   }
 });
 
