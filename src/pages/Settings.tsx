@@ -217,6 +217,34 @@ export default function Settings() {
     URL.revokeObjectURL(url);
   };
 
+  const exportToExcel = async () => {
+    try {
+      const response = await fetch("/api/export-excel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tasks,
+          files,
+          tenders,
+          contracts,
+          vendors,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Export failed");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `CNCIStoreManager-${new Date().toISOString().split("T")[0]}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error exporting to Excel:", error);
+    }
+  };
+
   const handleAddVendor = () => {
     if (!newVendorName) return;
     addVendor({ id: generateId(), name: newVendorName, firmName: newVendorFirm || newVendorName, city: newVendorCity, address: newVendorCity, phone: newVendorPhone, email: newVendorEmail, gstNo: newVendorGst, addedBy: currentUser.id, addedAt: new Date().toISOString() });
@@ -410,6 +438,19 @@ export default function Settings() {
 
         {/* DATA MANAGEMENT */}
         <TabsContent value="data" className="space-y-4 mt-0">
+          {/* Sync Data to Excel Section */}
+          <div className="bg-white rounded-xl border p-5 space-y-4 bg-amber-50 border-amber-200">
+            <h3 className="font-display font-semibold flex items-center gap-2"><Download className="size-4 text-amber-600" /> Sync Data to Excel</h3>
+            <p className="text-xs text-muted-foreground">Export all current application data (Tasks, Files, Tenders, Contracts, Vendors) to a single Excel file with multiple sheets.</p>
+            <Button 
+              onClick={exportToExcel} 
+              className="w-full gap-2 bg-amber-500 hover:bg-amber-600 text-white border-0"
+              title="Download all data as Excel file with multiple sheets"
+            >
+              <Download className="size-4" /> Download All Data as Excel
+            </Button>
+          </div>
+
           {/* Local Excel Data Section */}
           <div className="bg-white rounded-xl border p-5 space-y-4">
             <h3 className="font-display font-semibold flex items-center gap-2"><Download className="size-4 text-gold" /> Local Excel Data</h3>

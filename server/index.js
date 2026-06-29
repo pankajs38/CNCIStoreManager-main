@@ -67,6 +67,62 @@ app.post("/api/auth/logout", (req, res) => {
   res.status(410).json({ error: "OAuth/logout disabled in local-only mode" });
 });
 
+// ==================== EXPORT DATA TO EXCEL ENDPOINT ====================
+app.post("/api/export-excel", (req, res) => {
+  try {
+    const { tasks = [], files = [], tenders = [], contracts = [], vendors = [] } = req.body;
+
+    // Create a new workbook
+    const workbook = XLSX.utils.book_new();
+
+    // Add Tasks sheet
+    if (tasks.length > 0) {
+      const tasksWS = XLSX.utils.json_to_sheet(tasks);
+      XLSX.utils.book_append_sheet(workbook, tasksWS, "Tasks");
+    }
+
+    // Add Files sheet
+    if (files.length > 0) {
+      const filesWS = XLSX.utils.json_to_sheet(files);
+      XLSX.utils.book_append_sheet(workbook, filesWS, "Files");
+    }
+
+    // Add Tenders sheet
+    if (tenders.length > 0) {
+      const tendersWS = XLSX.utils.json_to_sheet(tenders);
+      XLSX.utils.book_append_sheet(workbook, tendersWS, "Tenders");
+    }
+
+    // Add Contracts sheet
+    if (contracts.length > 0) {
+      const contractsWS = XLSX.utils.json_to_sheet(contracts);
+      XLSX.utils.book_append_sheet(workbook, contractsWS, "Contracts");
+    }
+
+    // Add Vendors sheet
+    if (vendors.length > 0) {
+      const vendorsWS = XLSX.utils.json_to_sheet(vendors);
+      XLSX.utils.book_append_sheet(workbook, vendorsWS, "Vendors");
+    }
+
+    // Generate Excel file
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
+
+    // Send as file download
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="CNCIStoreManager-${new Date().toISOString().split('T')[0]}.xlsx"`);
+    res.send(excelBuffer);
+
+    console.log(`Exported Excel file with ${tasks.length} tasks, ${files.length} files, ${tenders.length} tenders, ${contracts.length} contracts, ${vendors.length} vendors`);
+  } catch (error) {
+    console.error("Error exporting Excel:", error);
+    res.status(500).json({ 
+      error: "Failed to export Excel file",
+      details: error.message 
+    });
+  }
+});
+
 // ==================== LOCAL EXCEL WRITE ENDPOINT ====================
 app.post("/api/write-sheet", (req, res) => {
   try {
